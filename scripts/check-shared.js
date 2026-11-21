@@ -55,6 +55,12 @@ assert.ok((await employee.rpc('apply_plan', {
   source_id: model.id, source_revision: model.revision, snapshot_name: model.name, snapshot_slots: model.slots,
 })).error);
 assert.deepEqual(await employeeStore.load(false), { templates: [], published: initial.published });
+assert.ok((await anonymous.rpc('get_waste_dashboard')).error);
+assert.equal(checked(await employee.rpc('get_waste_dashboard')), null);
+const wasteSnapshot = checked(await manager.rpc('get_waste_dashboard'));
+assert.ok(Array.isArray(wasteSnapshot.coverage));
+assert.ok(Array.isArray(wasteSnapshot.products));
+assert.ok(Array.isArray(wasteSnapshot.entries));
 
 assert.ok((await manager.from('published_plan').update({ applied_at: '2020-01-01Z' }).eq('id', 1)).error);
 let testModel;

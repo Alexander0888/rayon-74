@@ -4,8 +4,8 @@ import { HerbPicker, TemplateBar } from './components/EditorControls.jsx';
 import { Legend } from './components/Legend.jsx';
 import { PlanDialog } from '../../components/PlanDialog.jsx';
 import { AppHeader } from '../../app/AppHeader.jsx';
-import { Link, useBlocker, useOutletContext } from 'react-router';
-import { ArrowLeft } from 'lucide-react';
+import { SectionBreadcrumb } from '../../app/SectionBreadcrumb.jsx';
+import { useBlocker, useOutletContext } from 'react-router';
 import { Stand } from './components/Stand.jsx';
 import { fr, pageTitle } from '../../content/fr.js';
 import { copyTemplate, emptySlots, MAX_NAME_LENGTH, sameTemplate } from './data/plans.js';
@@ -292,10 +292,7 @@ function Workspace({ repository, canEdit, startEditing, signIn, signOut, signOut
         )}
       </AppHeader>
       <main className="page-width main" id="main-content" tabIndex={-1}>
-        <nav className="breadcrumb" aria-label={fr.navigation}>
-          <Link to="/"><ArrowLeft size={16} aria-hidden="true" />{fr.home}</Link>
-          <span aria-hidden="true">/</span><span aria-current="page">{fr.brand}</span>
-        </nav>
+        <SectionBreadcrumb title={fr.brand} />
         <header className="page-heading">
           <h1>{editing ? fr.editTitle : fr.viewTitle}</h1>
         </header>

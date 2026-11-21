@@ -7,7 +7,7 @@ import { fr, pageTitle } from '../content/fr.js';
 const sections = [
   { id: 'herbs', Icon: Leaf, to: '/herbs' },
   { id: 'visit', Icon: Map },
-  { id: 'waste', Icon: ChartNoAxesColumn },
+  { id: 'waste', Icon: ChartNoAxesColumn, to: '/waste' },
   { id: 'orders', Icon: ClipboardList },
   { id: 'labels', Icon: ScanLine },
   { id: 'promotions', Icon: Tag },
