@@ -10,8 +10,8 @@ test('home, direct links, refresh, browser history and unknown addresses', async
   const footer = page.getByRole('contentinfo');
   await expect(footer).toHaveText('Créé par nous, pour un avenir meilleur, ensemble.');
   await expect(page.locator('.section-card')).toHaveCount(6);
-  await expect(page.getByText('En développement', { exact: true })).toHaveCount(4);
-  await expect(page.locator('.section-grid a')).toHaveCount(2);
+  await expect(page.getByText('En développement', { exact: true })).toHaveCount(3);
+  await expect(page.locator('.section-grid a')).toHaveCount(3);
   await expect(page.locator('.section-planned a, .section-planned button')).toHaveCount(0);
   await noOverflow(page);
   await page.screenshot({ path: info.outputPath('home.png'), fullPage: true });
@@ -23,6 +23,12 @@ test('home, direct links, refresh, browser history and unknown addresses', async
   const wasteWidth = (await page.locator('main').boundingBox()).width;
   await breadcrumb.getByRole('link', { name: 'Accueil', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Les outils du rayon');
+  await page.getByRole('link', { name: /Analyse des commandes/ }).click();
+  await expect(page).toHaveURL(/#\/orders$/);
+  await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText('Analyse des commandes');
+  await expect(page.getByText('Connectez l’application à Supabase pour consulter les commandes.')).toBeVisible();
+  expect((await page.locator('main').boundingBox()).width).toBe(wasteWidth);
+  await breadcrumb.getByRole('link', { name: 'Accueil', exact: true }).click();
   await page.getByRole('link', { name: /Herbes fraîches/ }).click();
   await expect(page).toHaveURL(/#\/herbs$/);
   await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText('Herbes fraîches');

@@ -62,6 +62,12 @@ assert.ok(Array.isArray(wasteSnapshot.coverage));
 assert.ok(Array.isArray(wasteSnapshot.products));
 assert.ok(Array.isArray(wasteSnapshot.entries));
 
+const ordersDate = { p_delivery_date: '2026-11-23' };
+assert.ok((await anonymous.rpc('get_orders_for_delivery', ordersDate)).error);
+assert.equal(checked(await employee.rpc('get_orders_for_delivery', ordersDate)), null);
+assert.ok(Array.isArray(checked(await manager.rpc('get_orders_for_delivery', ordersDate)).lines));
+assert.ok((await manager.from('klarys_order_lines').select('id')).error);
+
 assert.ok((await manager.from('published_plan').update({ applied_at: '2020-01-01Z' }).eq('id', 1)).error);
 let testModel;
 try {

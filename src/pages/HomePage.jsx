@@ -8,7 +8,7 @@ const sections = [
   { id: 'herbs', Icon: Leaf, to: '/herbs' },
   { id: 'visit', Icon: Map },
   { id: 'waste', Icon: ChartNoAxesColumn, to: '/waste' },
-  { id: 'orders', Icon: ClipboardList },
+  { id: 'orders', Icon: ClipboardList, to: '/orders' },
   { id: 'labels', Icon: ScanLine },
   { id: 'promotions', Icon: Tag },
 ];

@@ -20,6 +20,7 @@ export const router = createHashRouter([
       { index: true, Component: HomePage },
       { path: 'herbs', Component: HerbsPage },
       { path: 'waste', lazy: async () => ({ Component: (await import('../features/waste/WastePage.jsx')).default }) },
+      { path: 'orders', lazy: async () => ({ Component: (await import('../features/orders/OrdersPage.jsx')).default }) },
       { path: '*', Component: NotFoundPage },
     ],
   },
