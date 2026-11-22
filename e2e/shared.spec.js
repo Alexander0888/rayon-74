@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { test, expect } from '@playwright/test';
 import { createSharedPlanStore } from '../src/features/herbs/data/sharedPlanStore.js';
 import { emptySlots } from '../src/features/herbs/data/plans.js';
-import { chooseHerb, confirm, filled, openEditor, selectTemplate } from './helpers.js';
+import { chooseHerb, confirm, filled, noOverflow, openEditor, selectTemplate } from './helpers.js';
 
 const settings = parseEnv(readFileSync('.env.shared.local', 'utf8'));
 if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(settings.VITE_SUPABASE_URL).hostname)) {
@@ -28,6 +28,63 @@ async function managerStore() {
   if (error) throw new Error('Could not sign in with the local demo manager.');
   return createSharedPlanStore(client);
 }
+
+test('orders show the Zurich delivery date, categories, statuses and responsive controls', async ({ page }) => {
+  const base = { ordered_unit_id: 7, package_quantity_unit_id: 5, per_box: 12,
+    price_amount: 3.80, price_unit_id: 5, currency_id: 1, origin_id: 181, counting_status: 'active' };
+  const lines = [
+    { ...base, id: 1, product_name: 'Clémentine de Corse', ordered_quantity: 3, validated_quantity: 2, validated_unit_id: 7, is_bio: true },
+    { ...base, id: 2, product_name: 'Avocat', ordered_quantity: 1, validated_quantity: null },
+    { ...base, id: 3, product_name: 'Tomate', ordered_quantity: 9, validated_quantity: null, counting_status: 'cancelled' },
+    { ...base, id: 4, product_name: 'Persil haché 4G', ordered_quantity: 1, validated_quantity: null },
+    { ...base, id: 5, product_name: 'Basilic', ordered_quantity: 1, validated_quantity: null },
+    { ...base, id: 6, product_name: 'Olives noires', ordered_quantity: 1, validated_quantity: null },
+    { ...base, id: 7, product_name: 'Dattes', ordered_quantity: 1, validated_quantity: null },
+  ];
+  const dates = [];
+  await page.route('**/rest/v1/rpc/get_orders_for_delivery', (route) => {
+    const day = route.request().postDataJSON().p_delivery_date;
+    dates.push(day);
+    return route.fulfill({ json: { lines: day === '2026-11-23' ? lines : [], latestDate: '2026-11-23' } });
+  });
+  await page.goto('/#/orders');
+  await expect(page.getByText('Connectez-vous avec un compte gestionnaire pour consulter les commandes.')).toBeVisible();
+  expect(dates).toHaveLength(0);
+  await login(page);
+  await page.clock.setFixedTime(new Date('2026-11-22T12:00:00Z'));
+  await page.reload();
+  const date = page.getByLabel('Date de livraison');
+  await expect(date).toHaveValue('2026-11-23');
+  const navigation = page.getByRole('navigation', { name: 'Accès rapide aux catégories' });
+  await expect(navigation.getByRole('button')).toHaveText(['Fruits', 'Légumes', '4e gamme', 'Herbes', 'Olives', 'Fruits secs']);
+  const fruits = page.getByRole('table', { name: 'Fruits', exact: true });
+  await expect(fruits.getByRole('rowheader').first()).toHaveText('Avocat');
+  const clementine = fruits.getByRole('row', { name: /Clémentine de Corse/ });
+  await expect(clementine.getByText('Bio', { exact: true })).toBeVisible();
+  await expect(clementine.getByText('2 colis', { exact: false })).toBeVisible();
+  await expect(clementine.getByRole('cell', { name: /3 colis/ })).toBeVisible();
+  await expect(clementine.getByText(/3,80.*€.*kg/)).toBeVisible();
+  const flag = clementine.getByRole('button', { name: 'France' });
+  await flag.hover();
+  await expect(clementine.locator('.orders-origin-tooltip')).toBeVisible();
+  await flag.click();
+  await expect(flag).toHaveAttribute('aria-expanded', 'true');
+  await page.getByRole('combobox', { name: 'Trier par' }).click();
+  await page.getByRole('option', { name: 'Quantité · Décroissante' }).click();
+  await expect(fruits.getByRole('rowheader').first()).toContainText('Clémentine');
+  await expect(page.getByRole('row', { name: /Tomate/ }).getByText('Annulé', { exact: true })).toBeVisible();
+  await navigation.getByRole('button', { name: 'Olives' }).click();
+  await expect(page.getByRole('heading', { name: 'Olives', exact: true })).toBeFocused();
+  await page.getByRole('searchbox', { name: 'Rechercher' }).fill('clementine');
+  await expect(page.getByRole('row', { name: /Tomate/ })).toHaveCount(0);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await noOverflow(page);
+  await date.fill('2026-11-10');
+  await expect(page.getByText('Aucune commande pour cette date.')).toBeVisible();
+  await page.getByRole('button', { name: 'Dernière livraison importée' }).click();
+  await expect(date).toHaveValue('2026-11-23');
+  expect(dates).toContain('2026-11-10');
+});
 
 test('shared login persists through routes; publication updates a separate public session', async ({ page, browser }) => {
   const store = await managerStore();

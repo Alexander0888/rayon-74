@@ -1,3 +1,7 @@
+import { isSunday, shiftDay } from '../../app/calendar.js';
+
+export { shiftDay, todayInZurich } from '../../app/calendar.js';
+
 export const categories = [
   { name: 'Légumes', color: '#41917a' },
   { name: 'Fruits', color: '#d89352' },
@@ -9,19 +13,10 @@ export const categories = [
 
 export const allCategories = () => new Set(categories.map(({ name }) => name));
 
-const calendarDate = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Europe/Zurich', year: 'numeric', month: '2-digit', day: '2-digit',
-});
 const frenchSort = new Intl.Collator('fr', { sensitivity: 'base', numeric: true });
 export const compareNames = (a, b) => frenchSort.compare(a, b);
 const date = (day) => new Date(`${day}T00:00:00Z`);
 const dayString = (value) => value.toISOString().slice(0, 10);
-export const todayInZurich = (now = new Date()) => calendarDate.format(now);
-export function shiftDay(day, offset) {
-  const value = date(day);
-  value.setUTCDate(value.getUTCDate() + offset);
-  return dayString(value);
-}
 
 function weekStart(day) {
   return shiftDay(day, -((date(day).getUTCDay() + 6) % 7));
@@ -68,7 +63,6 @@ export function validCustomRange([from, to], history, maxDays) {
 }
 
 const includesDay = (range, day) => Boolean(range?.[0] && range?.[1] && day >= range[0] && day <= range[1]);
-const isSunday = (day) => date(day).getUTCDay() === 0;
 export function graphDates(range) {
   if (!range?.[0] || !range?.[1]) return [];
   const days = [];
