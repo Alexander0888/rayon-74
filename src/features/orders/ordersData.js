@@ -40,12 +40,34 @@ export function groupOrders(lines, query, sort) {
   }
   const direction = sort.endsWith('Desc') ? -1 : 1;
   const byName = (a, b) => collator.compare(a.product_name, b.product_name) || a.id - b.id;
+  const compare = sort.startsWith('quantity')
+    ? (a, b) => direction * (a.ordered_quantity - b.ordered_quantity) || byName(a, b)
+    : (a, b) => direction * byName(a, b);
   for (const rows of Object.values(groups)) {
-    rows.sort((a, b) => sort.startsWith('quantity')
-      ? direction * (a.ordered_quantity - b.ordered_quantity) || byName(a, b)
-      : direction * byName(a, b));
+    rows.sort((a, b) => (b.counting_status === 'cancelled') - (a.counting_status === 'cancelled') || compare(a, b));
   }
   return groups;
+}
+
+export function groupOrdersByDay(deliveries, query, sort) {
+  const groups = Object.fromEntries(Object.keys(orders.groups).map((key) => [key, []]));
+  for (const { date, lines } of deliveries) {
+    for (const [category, matches] of Object.entries(groupOrders(lines, query, sort))) {
+      if (matches.length) groups[category].push({ date, lines: matches });
+    }
+  }
+  return groups;
+}
+
+export function orderSummaries(deliveries) {
+  const groups = Object.fromEntries(Object.keys(orders.groups).map((key) => [key, []]));
+  for (const { lines } of deliveries) {
+    for (const line of lines) groups[orderCategory(line)].push(line);
+  }
+  return {
+    total: orderTotals(categoryKeys.flatMap((category) => groups[category])),
+    categories: Object.fromEntries(Object.entries(groups).map(([key, lines]) => [key, orderTotals(lines)])),
+  };
 }
 
 export function orderTotals(lines) {

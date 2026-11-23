@@ -23,6 +23,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   outline: 2px solid #327956;
   outline-offset: 3px;
 }
+.filter-control:focus {
+  outline: 1px solid #638573;
+  outline-offset: -1px;
+}
 button:disabled { opacity: .48; }
 button[aria-pressed="true"]:not(:disabled) { cursor: default; }
 button { touch-action: manipulation; }

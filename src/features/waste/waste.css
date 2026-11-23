@@ -308,10 +308,6 @@ button.waste-report-name:hover { color: var(--waste-accent); }
   border-radius: 8px;
   font-size: 13px;
 }
-.waste-detail .waste-search input:focus {
-  outline: 1px solid #638573;
-  outline-offset: -1px;
-}
 .waste-detail-range { margin-top: 8px; }
 .waste-table-scroll { margin-top: 12px; max-height: 460px; overflow: auto; }
 .waste-table-scroll table { width: 100%; min-width: 520px; border-spacing: 0; font-size: 13px; }

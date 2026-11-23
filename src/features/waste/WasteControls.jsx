@@ -51,7 +51,7 @@ function FilterPopover({ label, caption, filtered, disabled, onOpen, children })
 
   return (
     <div className="waste-filter-menu">
-      <button ref={trigger} type="button" className={`waste-menu-trigger${filtered ? ' is-filtered' : ''}`} popoverTarget={id}
+      <button ref={trigger} type="button" className={`waste-menu-trigger filter-control${filtered ? ' is-filtered' : ''}`} popoverTarget={id}
         aria-label={label} aria-expanded={open} disabled={disabled} title={disabled ? waste.chooseCategoryFirst : undefined}>
         <span>{caption}</span><ChevronDown size={15} aria-hidden="true" />
       </button>
@@ -164,7 +164,7 @@ export function PeriodFilter({ history, today, period, onPeriod, custom, onCusto
           {[waste.from, waste.to].map((label, index) => (
             <label key={label} className="waste-control">
               <span>{label}</span>
-              <input type="date" min={index === 1 && maxDays && custom[0] ? custom[0] : history.first}
+              <input type="date" className="filter-control" min={index === 1 && maxDays && custom[0] ? custom[0] : history.first}
                 max={index === 1 && lastDay < history.latest ? lastDay : history.latest} value={custom[index]}
                 aria-invalid={!valid} onChange={(event) => {
                   const next = [...custom];

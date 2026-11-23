@@ -102,7 +102,7 @@ export function WasteSummary({ history, today, options }) {
           <WasteSelect className="waste-summary-period" label={waste.period} value={period}
             options={options.map((id) => ({ id, name: periodLabel(id, today) }))} onSelect={(next) => changeDate(setPeriod, next)} />
           {period === 'date' && (
-            <input type="date" className="waste-summary-date" aria-label={waste.reportDate} aria-invalid={!range}
+            <input type="date" className="waste-summary-date filter-control" aria-label={waste.reportDate} aria-invalid={!range}
               min={history.first} max={today} value={chosenDay} onChange={(event) => changeDate(setChosenDay, event.target.value)} />
           )}
         </div>

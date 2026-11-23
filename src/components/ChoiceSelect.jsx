@@ -95,7 +95,7 @@ export function ChoiceSelect({ label, options, value, placeholder, onSelect, dis
 
   return (
     <div className="choice-select" ref={root}>
-      <button type="button" className="choice-trigger" role="combobox" aria-label={label}
+      <button type="button" className="choice-trigger filter-control" role="combobox" aria-label={label}
         aria-describedby={valueId} aria-haspopup="listbox" aria-expanded={open} aria-controls={listId}
         aria-activedescendant={open ? `${listId}-${active}` : undefined}
         disabled={disabled || !options.length} onKeyDown={handleKey} onBlur={() => setActive(null)}

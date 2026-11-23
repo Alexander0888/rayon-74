@@ -9,7 +9,7 @@ function SortColumn({ field, label, order, onSort }) {
   const current = order.field === field;
   const Icon = current ? (order.direction === 'ascending' ? ArrowUp : ArrowDown) : ArrowDownUp;
   return <th scope="col" aria-sort={current ? order.direction : undefined}>
-    <button type="button" className="waste-sort-trigger" onClick={() => onSort(field)}>
+    <button type="button" className="waste-sort-trigger filter-control" onClick={() => onSort(field)}>
       {label}<Icon size={14} aria-hidden="true" />
     </button>
   </th>;
@@ -54,7 +54,7 @@ export function WasteTable({ history, today, metric }) {
           <label className="waste-control waste-search">
             <span>{waste.search}</span>
             <div><Search size={16} aria-hidden="true" />
-              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} />
+              <input type="search" className="filter-control" value={query} onChange={(event) => setQuery(event.target.value)} />
             </div>
           </label>
           <PeriodFilter history={history} today={today} period={period} onPeriod={(next) => changePeriod(setPeriod, next)}

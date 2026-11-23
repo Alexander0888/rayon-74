@@ -36,16 +36,26 @@ test('orders show the Zurich delivery date, categories, statuses and responsive 
     { ...base, id: 1, product_name: 'Clémentine de Corse', ordered_quantity: 3, validated_quantity: 2, validated_unit_id: 7, is_bio: true },
     { ...base, id: 2, product_name: 'Avocat', ordered_quantity: 1, validated_quantity: null },
     { ...base, id: 3, product_name: 'Tomate', ordered_quantity: 9, validated_quantity: null, counting_status: 'cancelled' },
-    { ...base, id: 4, product_name: 'Persil haché 4G', ordered_quantity: 1, validated_quantity: null },
+    { ...base, id: 4, product_name: 'Persil haché 4G', ordered_quantity: 1, validated_quantity: 1, validated_unit_id: 7 },
     { ...base, id: 5, product_name: 'Basilic', ordered_quantity: 1, validated_quantity: null },
     { ...base, id: 6, product_name: 'Olives noires', ordered_quantity: 1, validated_quantity: null },
     { ...base, id: 7, product_name: 'Dattes', ordered_quantity: 1, validated_quantity: null },
+    { ...base, id: 8, product_name: 'Pomme', ordered_quantity: 1, counting_status: 'cancelled' },
+    { ...base, id: 9, product_name: 'Concombre', ordered_quantity: 3, ordered_unit_id: 5, validated_quantity: 2, validated_unit_id: 5 },
+    { ...base, id: 12, product_name: 'Produit spécial', ordered_quantity: 99, validated_quantity: 99, validated_unit_id: 7 },
+  ];
+  const nextDay = [
+    { ...base, id: 10, product_name: 'Banane', ordered_quantity: 5, validated_quantity: 4, validated_unit_id: 7 },
+    { ...base, id: 11, product_name: 'Poire', ordered_quantity: 1, counting_status: 'cancelled' },
   ];
   const dates = [];
   await page.route('**/rest/v1/rpc/get_orders_for_delivery', (route) => {
     const day = route.request().postDataJSON().p_delivery_date;
     dates.push(day);
-    return route.fulfill({ json: { lines: day === '2026-11-23' ? lines : [], latestDate: '2026-11-23' } });
+    return route.fulfill({ json: {
+      lines: { '2026-11-23': lines, '2026-11-24': nextDay }[day] ?? [],
+      latestDate: '2026-11-24',
+    } });
   });
   await page.goto('/#/orders');
   await expect(page.getByText('Connectez-vous avec un compte gestionnaire pour consulter les commandes.')).toBeVisible();
@@ -55,10 +65,26 @@ test('orders show the Zurich delivery date, categories, statuses and responsive 
   await page.reload();
   const date = page.getByLabel('Date de livraison');
   await expect(date).toHaveValue('2026-11-23');
+  await date.evaluate((input) => {
+    input.showPicker = () => { input.dataset.pickerOpened = 'true'; };
+  });
+  await date.click({ position: { x: 15, y: 15 } });
+  await expect(date).toHaveAttribute('data-picker-opened', 'true');
+  await expect(date).toHaveCSS('outline-width', '1px');
   const navigation = page.getByRole('navigation', { name: 'Accès rapide aux catégories' });
   await expect(navigation.getByRole('button')).toHaveText(['Fruits', 'Légumes', '4e gamme', 'Herbes', 'Olives', 'Fruits secs']);
   const fruits = page.getByRole('table', { name: 'Fruits', exact: true });
-  await expect(fruits.getByRole('rowheader').first()).toHaveText('Avocat');
+  await expect(fruits.getByRole('columnheader')).toHaveText([
+    'Produit', 'Commandé', 'Confirmé à l’expédition', 'Origine', 'Conditionnement', 'Prix unitaire',
+  ]);
+  await expect(fruits.getByRole('rowheader')).toHaveText(['PommeAnnulé', 'Avocat', 'Clémentine de CorseBio']);
+  const summary = page.getByRole('table', { name: 'Totaux par catégorie' });
+  const total = summary.getByRole('row', { name: /^Total\b/ });
+  await expect(summary.getByRole('columnheader')).toHaveText(['Catégorie', 'Commandé', 'Confirmé']);
+  await expect(summary.getByRole('rowheader')).toHaveText(['Fruits', 'Légumes', '4e gamme', 'Herbes', 'Olives', 'Fruits secs', 'Total']);
+  await expect(summary.getByRole('row', { name: /^4e gamme\b/ }).getByRole('cell')).toHaveText(['1 colis', '1 colis']);
+  await expect(total.getByRole('cell')).toHaveText(['8 colis · 3 kg', '3 colis · 2 kg']);
+  await expect(page.getByRole('region', { name: 'Herbes', exact: true }).locator('dd')).toHaveText(['1 colis', '0']);
   const clementine = fruits.getByRole('row', { name: /Clémentine de Corse/ });
   await expect(clementine.getByText('Bio', { exact: true })).toBeVisible();
   await expect(clementine.getByText('2 colis', { exact: false })).toBeVisible();
@@ -71,18 +97,33 @@ test('orders show the Zurich delivery date, categories, statuses and responsive 
   await expect(flag).toHaveAttribute('aria-expanded', 'true');
   await page.getByRole('combobox', { name: 'Trier par' }).click();
   await page.getByRole('option', { name: 'Quantité · Décroissante' }).click();
-  await expect(fruits.getByRole('rowheader').first()).toContainText('Clémentine');
+  await expect(fruits.getByRole('rowheader')).toHaveText(['PommeAnnulé', 'Clémentine de CorseBio', 'Avocat']);
   await expect(page.getByRole('row', { name: /Tomate/ }).getByText('Annulé', { exact: true })).toBeVisible();
   await navigation.getByRole('button', { name: 'Olives' }).click();
   await expect(page.getByRole('heading', { name: 'Olives', exact: true })).toBeFocused();
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill('clementine');
   await expect(page.getByRole('row', { name: /Tomate/ })).toHaveCount(0);
+  await expect(total.getByRole('cell')).toHaveText(['8 colis · 3 kg', '3 colis · 2 kg']);
+  await page.getByRole('searchbox', { name: 'Rechercher' }).clear();
+  await page.getByRole('button', { name: 'Choisir une période' }).click();
+  await page.getByLabel('Au', { exact: true }).fill('2026-11-22');
+  await expect(page.getByText('La date de fin doit être égale ou postérieure à la date de début.')).toBeVisible();
+  await page.getByLabel('Au', { exact: true }).fill('2026-11-24');
+  const fruitRegion = page.getByRole('region', { name: 'Fruits', exact: true });
+  await expect(fruitRegion.locator('time')).toHaveText(['lundi 23 novembre 2026', 'mardi 24 novembre 2026']);
+  const fruitDays = fruitRegion.getByRole('table');
+  await expect(fruitDays.first().getByRole('rowheader').first()).toContainText('Pomme');
+  await expect(fruitDays.last().getByRole('rowheader').first()).toContainText('Poire');
+  await expect(fruitRegion.locator('dd')).toHaveText(['9 colis', '6 colis']);
+  await expect(total.getByRole('cell')).toHaveText(['13 colis · 3 kg', '7 colis · 2 kg']);
   await page.setViewportSize({ width: 375, height: 812 });
   await noOverflow(page);
+  await page.getByRole('button', { name: 'Un seul jour' }).click();
+  await expect(fruitRegion.locator('time')).toHaveCount(0);
   await date.fill('2026-11-10');
   await expect(page.getByText('Aucune commande pour cette date.')).toBeVisible();
   await page.getByRole('button', { name: 'Dernière livraison importée' }).click();
-  await expect(date).toHaveValue('2026-11-23');
+  await expect(date).toHaveValue('2026-11-24');
   expect(dates).toContain('2026-11-10');
 });
 
@@ -199,6 +240,8 @@ test('waste dashboard ranks subgroups, reveals articles and keeps report control
   await expect(first).toContainText('19 novembre 2026');
   await select(first, 'Période', 'Choisir une date');
   const date = first.getByLabel('Date du rapport');
+  await date.focus();
+  await expect(date).toHaveCSS('outline-width', '1px');
   const periodBox = await firstPeriod.boundingBox();
   const dateBox = await date.boundingBox();
   expect(dateBox.x).toBeGreaterThanOrEqual(periodBox.x + periodBox.width);
@@ -285,6 +328,7 @@ test('waste dashboard ranks subgroups, reveals articles and keeps report control
 
   const search = detail.getByRole('searchbox', { name: 'Rechercher un produit' });
   await search.fill('aub');
+  await expect(search).toHaveCSS('outline-width', '1px');
   await expect(detail.locator('tbody tr')).toHaveCount(2);
   await expect(detail.locator('tbody')).toContainText('Aubergines KG');
   await expect(detail.locator('tbody')).not.toContainText('Aubergine IMP');

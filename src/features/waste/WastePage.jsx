@@ -59,7 +59,7 @@ function WasteDashboard({ snapshot }) {
           <PeriodFilter history={history} today={today} period={period} onPeriod={setPeriod} custom={custom} onCustom={setCustom} />
           <WasteSelect label={waste.movingAverage} value={averageDays} onSelect={setAverageDays} caption
             options={[7, 14, 30, 60, 90].map((id) => ({ id, name: waste.averageDays(id) }))} />
-          <button className="button waste-reset" type="button" onClick={reset}>
+          <button className="button waste-reset filter-control" type="button" onClick={reset}>
             <RotateCcw size={15} aria-hidden="true" />{waste.reset}
           </button>
         </div>
