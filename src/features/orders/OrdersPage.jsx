@@ -256,30 +256,33 @@ function OrdersDashboard() {
 
   return (
     <>
-      <div className="orders-toolbar">
-        <div className="orders-controls">
-          <DeliveryControls from={from} to={endDate} onFrom={setFrom} onTo={setEndDate}
-            onToggle={() => setEndDate(endDate === null ? from : null)} invalid={invalidPeriod} />
-          <label className="orders-field orders-query">{orders.search}
-            <span className="orders-search">
-              <Search size={16} aria-hidden="true" />
-              <input type="search" className="filter-control" value={query} placeholder={orders.searchPlaceholder}
-                onChange={(event) => setQuery(event.target.value)} />
-            </span>
-          </label>
-          <div className="orders-field">
-            <span aria-hidden="true">{orders.sortLabel}</span>
-            <ChoiceSelect label={orders.sortLabel} options={sortOptions} value={sort} onSelect={setSort} />
+      <div className="orders-overview">
+        <div className="orders-toolbar">
+          <div className="orders-controls">
+            <DeliveryControls from={from} to={endDate} onFrom={setFrom} onTo={setEndDate}
+              onToggle={() => setEndDate(endDate === null ? from : null)} invalid={invalidPeriod} />
+            <label className="orders-field">{orders.search}
+              <span className="orders-search">
+                <Search size={16} aria-hidden="true" />
+                <input type="search" className="filter-control" value={query} placeholder={orders.searchPlaceholder}
+                  onChange={(event) => setQuery(event.target.value)} />
+              </span>
+            </label>
+            <div className="orders-field">
+              <span aria-hidden="true">{orders.sortLabel}</span>
+              <ChoiceSelect label={orders.sortLabel} options={sortOptions} value={sort} onSelect={setSort} />
+            </div>
           </div>
+          <nav className="orders-jump" aria-label={orders.jumpLabel}>
+            {categoryKeys.map((category) => (
+              <button className="button orders-jump-button" key={category} type="button" disabled={!hasMatches}
+                onClick={() => jumpTo(category)}>
+                {orders.groups[category]}<ArrowDown size={14} aria-hidden="true" />
+              </button>
+            ))}
+          </nav>
         </div>
-        <nav className="orders-jump" aria-label={orders.jumpLabel}>
-          {categoryKeys.map((category) => (
-            <button className="button orders-jump-button" key={category} type="button" disabled={!hasMatches}
-              onClick={() => jumpTo(category)}>
-              {orders.groups[category]}<ArrowDown size={14} aria-hidden="true" />
-            </button>
-          ))}
-        </nav>
+        {hasLines && <CategorySummary totals={totals} />}
       </div>
       {!hasDates && <p className="orders-message" role="status">{endDate === null ? orders.chooseDate : orders.choosePeriod}</p>}
       {invalidPeriod && <p className="orders-message" role="status">{orders.invalidPeriod}</p>}
@@ -293,7 +296,6 @@ function OrdersDashboard() {
         {data.latestDate && (data.latestDate < from || data.latestDate > to) && <button className="button" type="button"
           onClick={() => { setFrom(data.latestDate); setEndDate(null); }}>{orders.latest}</button>}
       </div>}
-      {hasLines && <CategorySummary totals={totals} />}
       {hasLines && !hasMatches && <p className="orders-message" role="status">{orders.noMatches}</p>}
       {hasMatches && <div className="orders-groups">
         {categoryKeys.map((category) => <OrderGroup key={category} category={category} days={grouped[category]}
