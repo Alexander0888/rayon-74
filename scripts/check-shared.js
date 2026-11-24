@@ -61,6 +61,20 @@ const wasteSnapshot = checked(await manager.rpc('get_waste_dashboard'));
 assert.ok(Array.isArray(wasteSnapshot.coverage));
 assert.ok(Array.isArray(wasteSnapshot.products));
 assert.ok(Array.isArray(wasteSnapshot.entries));
+assert.ok((await anonymous.from('waste_products').select('variant')).error);
+assert.ok((await anonymous.from('waste_daily').select('recorded_on')).error);
+assert.ok((await anonymous.schema('waste_demo').from('entries').select('recorded_on')).error);
+assert.ok((await anonymous.schema('waste_demo').rpc('generate_days')).error);
+const guestWaste = checked(await anonymous.rpc('get_waste_demo_dashboard'));
+assert.deepEqual(Object.keys(guestWaste).sort(), ['coverage', 'entries', 'products']);
+assert.deepEqual(checked(await anonymous.rpc('get_waste_demo_dashboard')), guestWaste);
+const realArticles = new Set(wasteSnapshot.products.map((product) => product[5].replace(/[^0-9]/g, '')));
+const demoArticles = new Set(guestWaste.products.map((product) => product[5]));
+assert.equal(demoArticles.size, guestWaste.products.length);
+for (const reference of demoArticles) {
+  assert.match(reference, /^\d+$/);
+  assert.ok(!realArticles.has(reference));
+}
 
 const ordersDate = { p_delivery_date: '2026-11-23' };
 assert.ok((await anonymous.rpc('get_orders_for_delivery', ordersDate)).error);

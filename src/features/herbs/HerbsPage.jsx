@@ -25,7 +25,7 @@ export default function HerbsPage() {
   return <Workspace key={workspaceKey} repository={sharedWorkspace || localWorkspace} {...account} />;
 }
 
-function Workspace({ repository, canEdit, startEditing, signIn, signOut, signOutError }) {
+function Workspace({ repository, canEdit, isDemo, startEditing, signIn, signOut, signOutError }) {
   const [plans, setPlans] = useState(null);
   const [mode, setMode] = useState(startEditing ? 'edit' : 'view');
   const [draft, setDraft] = useState(null);
@@ -279,7 +279,7 @@ function Workspace({ repository, canEdit, startEditing, signIn, signOut, signOut
 
   return (
     <>
-      <AppHeader signIn={signIn} signOut={signOut && (() => leaveDraft(signOut))} pending={pending}>
+      <AppHeader isDemo={isDemo} signIn={signIn} signOut={signOut && (() => leaveDraft(signOut))} pending={pending}>
         {canEdit && (
           <div className="mode-switch" role="group" aria-label={fr.modes}>
             <button type="button" aria-pressed={!editing} onClick={() => changeMode('view')} disabled={pending}>

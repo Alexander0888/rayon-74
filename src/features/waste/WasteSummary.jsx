@@ -103,7 +103,7 @@ function RankedRow({ row, disclosure, showCategory }) {
   </li>;
 }
 
-export function WasteSummary({ history, today, options }) {
+export function WasteSummary({ history, today, options, isDemo }) {
   const [period, setPeriod] = useState(options[0]);
   const [chosenDay, setChosenDay] = useState(() => history.latest < today ? history.latest : today);
   const [rankBy, setRankBy] = useState('subgroup');
@@ -116,8 +116,8 @@ export function WasteSummary({ history, today, options }) {
   const { total, breakdown, top } = useMemo(() => summary(history, range, rankBy), [history, range, rankBy]);
   const covered = hasCoverage(history, range);
   const coverageNote = range?.[1] > history.latest ? waste.partial(longDay(history.latest))
-    : graphDates(range).some((day) => !isCovered(history, day)) ? waste.partialCoverage : null;
-  const title = periodLabel(period, today);
+    : graphDates(range, history.includeSundays).some((day) => !isCovered(history, day)) ? waste.partialCoverage : null;
+  const title = periodLabel(period, today, isDemo);
 
   function changeDate(setter, value) {
     setter(value);
@@ -130,7 +130,7 @@ export function WasteSummary({ history, today, options }) {
       <header className="waste-summary-head">
         <div className="waste-summary-controls">
           <WasteSelect className="waste-summary-period" label={waste.period} value={period}
-            options={options.map((id) => ({ id, name: periodLabel(id, today) }))} onSelect={(next) => changeDate(setPeriod, next)} />
+            options={options.map((id) => ({ id, name: periodLabel(id, today, isDemo) }))} onSelect={(next) => changeDate(setPeriod, next)} />
           {period === 'date' && (
             <input type="date" className="waste-summary-date filter-control" aria-label={waste.reportDate} aria-invalid={!range}
               min={history.first} max={today} value={chosenDay} onChange={(event) => changeDate(setChosenDay, event.target.value)} />

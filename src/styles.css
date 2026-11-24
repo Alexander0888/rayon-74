@@ -35,6 +35,33 @@ svg { flex: none; }
 
 .page-width { width: min(100% - 48px, 1056px); margin-inline: auto; }
 .site-header { background: var(--surface); border-bottom: 1px solid var(--line); }
+.demo-notice {
+  color: #394d42;
+  background: #edf4ee;
+  border-top: 1px solid #e1ebe2;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.demo-notice-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 16px;
+}
+.demo-notice p { padding-block: 7px; }
+.demo-notice strong { color: var(--green-dark); margin-inline-end: 10px; white-space: nowrap; }
+.demo-sign-in {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--green-dark);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.demo-sign-in:hover { color: var(--green); }
 .header-inner {
   display: flex;
   align-items: center;

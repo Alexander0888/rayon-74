@@ -2,7 +2,7 @@ import { Leaf, LogIn, LogOut } from 'lucide-react';
 import { Link } from 'react-router';
 import { fr } from '../content/fr.js';
 
-export function AppHeader({ children, signIn, signOut, pending = false }) {
+export function AppHeader({ children, isDemo, signIn, signOut, pending = false }) {
   return (
     <header className="site-header">
       <div className="page-width header-inner">
@@ -12,7 +12,7 @@ export function AppHeader({ children, signIn, signOut, pending = false }) {
         </Link>
         <div className="header-actions">
           {children}
-          {signIn && (
+          {signIn && !isDemo && (
             <button type="button" className="button sign-in" onClick={signIn} disabled={pending}>
               <LogIn aria-hidden="true" />{fr.signIn}
             </button>
@@ -25,6 +25,16 @@ export function AppHeader({ children, signIn, signOut, pending = false }) {
           )}
         </div>
       </div>
+      {isDemo && (
+        <div className="demo-notice">
+          <div className="page-width demo-notice-inner">
+            <p><strong>{fr.demoMode}</strong><span>{fr.demoNotice}</span></p>
+            <button type="button" className="demo-sign-in" onClick={signIn} disabled={pending}>
+              {fr.signIn}
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

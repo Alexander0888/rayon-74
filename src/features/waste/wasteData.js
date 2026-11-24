@@ -63,22 +63,23 @@ export function validCustomRange([from, to], history, maxDays) {
 }
 
 const includesDay = (range, day) => Boolean(range?.[0] && range?.[1] && day >= range[0] && day <= range[1]);
-export function graphDates(range) {
+export function graphDates(range, includeSundays = false) {
   if (!range?.[0] || !range?.[1]) return [];
   const days = [];
   for (let day = range[0]; day <= range[1]; day = shiftDay(day, 1)) {
-    if (!isSunday(day)) days.push(day);
+    if (includeSundays || !isSunday(day)) days.push(day);
   }
   return days;
 }
 
-export function buildHistory({ importedAt, coverage, products, entries }, metric = 'pa') {
+export function buildHistory({ importedAt, coverage, products, entries }, metric = 'pa', includeSundays = false) {
   const catalog = new Map(products.map(([id, name, category, group, subgroup, reference]) => [
     id, { id, name, category, group, subgroup, reference },
   ]));
   return {
     importedAt,
     coverage,
+    includeSundays,
     first: coverage.reduce((day, [start]) => (!day || start < day ? start : day), null),
     latest: coverage.reduce((day, [, end]) => (!day || end > day ? end : day), null),
     latestRecorded: entries.reduce((latest, [day]) => (!latest || day > latest ? day : latest), null),
@@ -111,9 +112,9 @@ export function trend(history, range, selected, movingDays) {
     if (selected.has(product.category)) amounts.set(day, (amounts.get(day) ?? 0) + amount);
   }
   const valueFor = (day) => isCovered(history, day) ? amounts.get(day) ?? 0 : null;
-  return graphDates(range).map((day) => {
+  return graphDates(range, history.includeSundays).map((day) => {
     const amount = valueFor(day);
-    const previous = graphDates([shiftDay(day, -movingDays), shiftDay(day, -1)]).map(valueFor);
+    const previous = graphDates([shiftDay(day, -movingDays), shiftDay(day, -1)], history.includeSundays).map(valueFor);
     const average = amount === null || previous.some((value) => value === null) ? null
       : previous.reduce((total, value) => total + value, 0) / previous.length;
     return { day, amount, average };
@@ -180,7 +181,7 @@ export function tableRows(subgroups, groups, query, order) {
 }
 
 export function heatRows(history, range, grouping, query) {
-  const days = graphDates(range);
+  const days = graphDates(range, history.includeSundays);
   const rows = rollupRows(subgroupRows(history, range, new Set(days)), grouping);
   const keyword = searchKey(query.trim());
   return {

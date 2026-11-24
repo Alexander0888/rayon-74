@@ -16,8 +16,8 @@ export const importStamp = (timestamp) => stamp.format(new Date(timestamp));
 export const rangeLabel = ([first, last]) => first === last ? longDay(first)
   : `${first.slice(0, 4) === last.slice(0, 4) ? shortDay(first) : longDay(first)} – ${longDay(last)}`;
 
-export function periodLabel(period, today) {
-  if (period === 'latest') return waste.lastDay;
+export function periodLabel(period, today, isDemo) {
+  if (period === 'latest') return isDemo ? waste.lastSimulatedDay : waste.lastDay;
   if (period === 'week') return `${waste.periods.week} (${waste.weekNumber(isoWeek(today))})`;
   if (period === 'month') {
     const label = month.format(dayDate(today));

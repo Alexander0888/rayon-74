@@ -221,6 +221,11 @@ test('waste dashboard ranks subgroups, reveals articles and keeps report control
     ...historical.map(([id]) => ['2026-10-02', id, 100, 200]),
   ];
   let requests = 0;
+  await page.route('**/rest/v1/rpc/get_waste_demo_dashboard', (route) => route.fulfill({ json: {
+    coverage: [['2026-10-01', '2026-11-22']],
+    products: [[1, 'Poire de démonstration', 'Fruits', 'Poires', 'Poires KG', '4709']],
+    entries: [['2026-11-22', 1, 2700, 5400]],
+  } }));
   await page.route('**/rest/v1/rpc/get_waste_dashboard', (route) => {
     requests += 1;
     return route.fulfill({ json: {
@@ -233,9 +238,17 @@ test('waste dashboard ranks subgroups, reveals articles and keeps report control
     await scope.getByRole('listbox', { name, exact: true }).getByRole('option', { name: option, exact: true }).click();
   }
 
+  await page.clock.setFixedTime(new Date('2026-11-22T11:00:00Z'));
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/#/waste');
-  await expect(page.getByText('Connectez-vous avec un compte gestionnaire pour consulter les pertes.')).toBeVisible();
+  await expect(page.getByText('Mode démo', { exact: true })).toBeVisible();
+  await expect(page.getByText('Données simulées jusqu’au')).toBeVisible();
+  await expect(page.getByText('Dernier import', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.waste-total').first()).toHaveText(/^27\sCHF$/);
+  await expect(page.getByRole('columnheader', { name: '22 nov.', exact: true })).toBeVisible();
+  await noOverflow(page);
   expect(requests).toBe(0);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await login(page);
   await page.clock.setFixedTime(new Date('2026-11-21T11:00:00Z'));
   await page.reload();
@@ -243,6 +256,7 @@ test('waste dashboard ranks subgroups, reveals articles and keeps report control
   const first = summaries.first();
   const dashboard = page.locator('.waste-page');
   await expect(summaries).toHaveCount(3);
+  await expect(page.getByText('Mode démo', { exact: true })).toHaveCount(0);
   const freshness = dashboard.locator('.waste-freshness');
   await expect(freshness.getByText('Dernier jour chargé')).toBeVisible();
   await expect(freshness.locator('time[datetime="2026-11-13"]')).toBeVisible();
@@ -464,6 +478,10 @@ test('waste dashboard ranks subgroups, reveals articles and keeps report control
     }
     await touch.detach();
   });
+
+  await page.getByRole('button', { name: 'Se déconnecter', exact: true }).click();
+  await expect(page.getByText('Mode démo', { exact: true })).toBeVisible();
+  await expect(first.locator('.waste-total')).toHaveText(/^27\sCHF$/);
 });
 
 test('a failed save during navigation keeps the draft and allows retry', async ({ page }) => {

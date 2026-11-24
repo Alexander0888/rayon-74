@@ -65,7 +65,7 @@ function SignIn({ client, membership, onSuccess, onClose }) {
 }
 
 export function SharedAccess({ client, children }) {
-  const [userId, setUserId] = useState(null);
+  const [userId, setUserId] = useState(undefined);
   const [membership, setMembership] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -120,6 +120,8 @@ export function SharedAccess({ client, children }) {
       {children({
         workspaceKey: canEdit ? userId : 'public',
         canEdit,
+        isDemo: userId === null,
+        accessPending: userId === undefined || Boolean(userId && !currentMembership),
         startEditing: canEdit && loginOpen,
         signIn: canEdit ? undefined : () => setLoginOpen(true),
         signOut: canEdit ? signOut : undefined,

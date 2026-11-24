@@ -14,16 +14,17 @@ import { WasteTrend } from './WasteTrend.jsx';
 import { WasteTable } from './WasteTable.jsx';
 import './waste.css';
 
-function WasteDashboard({ snapshot }) {
+function WasteDashboard({ snapshot, isDemo }) {
   const today = todayInZurich();
   const [metric, setMetric] = useState('pa');
-  const history = useMemo(() => buildHistory(snapshot, metric), [snapshot, metric]);
+  const history = useMemo(() => buildHistory(snapshot, metric, isDemo), [snapshot, metric, isDemo]);
   const [period, setPeriod] = useState('last30');
   const [custom, setCustom] = useState(() => periodRange('last30', history.latest, today));
   const [selected, setSelected] = useState(allCategories);
   const [averageDays, setAverageDays] = useState(30);
   const range = useMemo(() => selectedRange(history, today, period, custom), [history, today, period, custom]);
   const points = useMemo(() => trend(history, range, selected, averageDays), [history, range, selected, averageDays]);
+  const reportDay = isDemo ? history.latest : history.latestRecorded;
   const status = !range ? waste.invalidRange : !selected.size ? waste.noCategories
     : !hasCoverage(history, range) ? waste.missingPeriod : null;
 
@@ -43,15 +44,16 @@ function WasteDashboard({ snapshot }) {
             options={Object.entries(waste.metrics).map(([id, name]) => ({ id, name }))} />
         </div>
         <dl className="waste-freshness">
-          <div><dt>{waste.lastImport}</dt><dd><time dateTime={history.importedAt}>{importStamp(history.importedAt)}</time></dd></div>
+          {!isDemo && <div><dt>{waste.lastImport}</dt><dd><time dateTime={history.importedAt}>{importStamp(history.importedAt)}</time></dd></div>}
           <div>
-            <dt>{waste.lastDay}</dt>
-            <dd>{history.latestRecorded ? <time dateTime={history.latestRecorded}>{longDay(history.latestRecorded)}</time> : '—'}</dd>
+            <dt>{isDemo ? waste.simulatedThrough : waste.lastDay}</dt>
+            <dd>{reportDay ? <time dateTime={reportDay}>{longDay(reportDay)}</time> : '—'}</dd>
           </div>
         </dl>
       </header>
       <div className="waste-summaries">
-        <WasteSummary history={history} today={today} options={['latest', 'yesterday', 'today', 'beforeYesterday', 'date']} />
+        <WasteSummary history={history} today={today} isDemo={isDemo}
+          options={['latest', 'yesterday', 'today', 'beforeYesterday', 'date']} />
         <WasteSummary history={history} today={today} options={['last7', 'week']} />
         <WasteSummary history={history} today={today} options={['last30', 'month']} />
       </div>
@@ -91,7 +93,7 @@ function WasteStatus({ children, error = false }) {
   );
 }
 
-function SharedWaste() {
+function SharedWaste({ isDemo }) {
   const [state, setState] = useState({ pending: true });
   const [attempt, setAttempt] = useState(0);
 
@@ -99,7 +101,8 @@ function SharedWaste() {
     const controller = new AbortController();
     async function load() {
       try {
-        const { data, error } = await supabase.rpc('get_waste_dashboard').abortSignal(controller.signal);
+        const dashboard = isDemo ? 'get_waste_demo_dashboard' : 'get_waste_dashboard';
+        const { data, error } = await supabase.rpc(dashboard).abortSignal(controller.signal);
         if (error || !data) throw error;
         if (!controller.signal.aborted) setState({ snapshot: data });
       } catch {
@@ -108,7 +111,7 @@ function SharedWaste() {
     }
     void load();
     return () => controller.abort();
-  }, [attempt]);
+  }, [attempt, isDemo]);
 
   if (state.pending) return <WasteStatus>{fr.loading}</WasteStatus>;
   if (state.error) return (
@@ -120,8 +123,16 @@ function SharedWaste() {
       }}>{fr.retry}</button>
     </WasteStatus>
   );
-  if (!state.snapshot.coverage.length) return <WasteStatus>{waste.emptyHistory}</WasteStatus>;
-  return <WasteDashboard snapshot={state.snapshot} />;
+  if (!state.snapshot.coverage.length) return <WasteStatus>{isDemo ? waste.emptyDemo : waste.emptyHistory}</WasteStatus>;
+  return <WasteDashboard snapshot={state.snapshot} isDemo={isDemo} />;
+}
+
+function WasteReport({ account }) {
+  if (!supabase) return <WasteStatus>{waste.unavailable}</WasteStatus>;
+  if (account.accessPending) return <WasteStatus>{fr.loading}</WasteStatus>;
+  if (account.isDemo) return <SharedWaste key="demo" isDemo />;
+  if (account.canEdit) return <SharedWaste key={account.workspaceKey} />;
+  return <WasteStatus>{waste.access}</WasteStatus>;
 }
 
 export default function WastePage() {
@@ -134,8 +145,7 @@ export default function WastePage() {
       <main className="page-width main waste-page" id="main-content" tabIndex={-1}>
         <SectionBreadcrumb title={fr.sections.waste.title} />
         {account.signOutError && <p className="notice error" role="alert">{fr.connectionError}</p>}
-        {supabase && account.canEdit ? <SharedWaste key={account.workspaceKey} />
-          : <WasteStatus>{supabase ? waste.access : waste.unavailable}</WasteStatus>}
+        <WasteReport account={account} />
       </main>
     </>
   );
