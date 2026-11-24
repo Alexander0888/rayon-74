@@ -22,7 +22,7 @@ const history = buildHistory({
 test('rolling periods use the loaded report end and calendar periods use Zurich today', () => {
   const today = todayInZurich(new Date('2026-11-20T23:15:00Z'));
   assert.equal(today, '2026-11-21');
-  assert.deepEqual(periodRange('latest', history.latest, today), ['2026-11-13', '2026-11-13']);
+  assert.deepEqual(periodRange('latest', history.latestRecorded, today), ['2026-11-13', '2026-11-13']);
   assert.deepEqual(periodRange('yesterday', history.latest, today), ['2026-11-20', '2026-11-20']);
   assert.deepEqual(periodRange('today', history.latest, today), ['2026-11-21', '2026-11-21']);
   assert.deepEqual(periodRange('beforeYesterday', history.latest, today), ['2026-11-19', '2026-11-19']);
@@ -34,6 +34,17 @@ test('rolling periods use the loaded report end and calendar periods use Zurich 
   assert.equal(isoWeek(today), 47);
   assert.equal(isoWeek('2021-01-01'), 53);
   assert.equal(periodLabel('week', today), 'Cette semaine (Semaine 47)');
+});
+
+test('the last recorded day uses entry dates even when the final covered days are empty', () => {
+  const coverage = [['2026-11-14', '2026-11-23']];
+  const products = [[1, 'Orange', 'Fruits', 'Oranges', 'Oranges KG']];
+  const report = buildHistory({ coverage, products, entries: [['2026-11-21', 1, 0, 0], ['2026-11-20', 1, 3500, 5600]] });
+
+  assert.equal(report.latest, '2026-11-23');
+  assert.deepEqual(periodRange('latest', report.latestRecorded, '2026-11-24'), ['2026-11-21', '2026-11-21']);
+  const empty = buildHistory({ coverage, products, entries: [] });
+  assert.equal(periodRange('latest', empty.latestRecorded, '2026-11-24'), null);
 });
 
 test('a 30-day custom heatmap period counts both endpoints across months', () => {
