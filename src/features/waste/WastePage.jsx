@@ -44,7 +44,10 @@ function WasteDashboard({ snapshot }) {
         </div>
         <dl className="waste-freshness">
           <div><dt>{waste.lastImport}</dt><dd><time dateTime={history.importedAt}>{importStamp(history.importedAt)}</time></dd></div>
-          <div><dt>{waste.lastDay}</dt><dd><time dateTime={history.latest}>{longDay(history.latest)}</time></dd></div>
+          <div>
+            <dt>{waste.lastDay}</dt>
+            <dd>{history.latestRecorded ? <time dateTime={history.latestRecorded}>{longDay(history.latestRecorded)}</time> : '—'}</dd>
+          </div>
         </dl>
       </header>
       <div className="waste-summaries">

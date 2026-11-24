@@ -33,7 +33,7 @@ export function periodRange(period, latest, today, custom) {
   const next = date(monthStart);
   next.setUTCMonth(next.getUTCMonth() + 1);
   switch (period) {
-    case 'latest': return [latest, latest];
+    case 'latest': return latest ? [latest, latest] : null;
     case 'today': return [today, today];
     case 'yesterday': {
       const day = shiftDay(today, -1);
@@ -81,6 +81,7 @@ export function buildHistory({ importedAt, coverage, products, entries }, metric
     coverage,
     first: coverage.reduce((day, [start]) => (!day || start < day ? start : day), null),
     latest: coverage.reduce((day, [, end]) => (!day || end > day ? end : day), null),
+    latestRecorded: entries.reduce((latest, [day]) => (!latest || day > latest ? day : latest), null),
     entries: entries.map(([day, id, pa, ventes]) => ({
       day, product: catalog.get(id), amount: metric === 'pa' ? pa : ventes,
     })),

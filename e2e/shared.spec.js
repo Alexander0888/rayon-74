@@ -223,7 +223,7 @@ test('waste dashboard ranks subgroups, reveals articles and keeps report control
   await page.route('**/rest/v1/rpc/get_waste_dashboard', (route) => {
     requests += 1;
     return route.fulfill({ json: {
-      importedAt: '2026-11-20T06:30:00Z', coverage: [['2026-09-01', '2026-11-13']], products: [...products, ...historical], entries,
+      importedAt: '2026-11-20T06:30:00Z', coverage: [['2026-09-01', '2026-11-14']], products: [...products, ...historical], entries,
     } });
   });
 
@@ -242,7 +242,9 @@ test('waste dashboard ranks subgroups, reveals articles and keeps report control
   const first = summaries.first();
   const dashboard = page.locator('.waste-page');
   await expect(summaries).toHaveCount(3);
-  await expect(dashboard.locator('.waste-freshness').getByText('Dernier jour chargé')).toBeVisible();
+  const freshness = dashboard.locator('.waste-freshness');
+  await expect(freshness.getByText('Dernier jour chargé')).toBeVisible();
+  await expect(freshness.locator('time[datetime="2026-11-13"]')).toBeVisible();
   await expect(dashboard.locator('select')).toHaveCount(0);
   const firstPeriod = first.getByRole('combobox', { name: 'Période' });
   await expect(firstPeriod).toHaveText('Dernier jour chargé');
@@ -263,7 +265,7 @@ test('waste dashboard ranks subgroups, reveals articles and keeps report control
   const dateBox = await date.boundingBox();
   expect(dateBox.x).toBeGreaterThanOrEqual(periodBox.x + periodBox.width);
   expect(Math.abs(dateBox.y + dateBox.height / 2 - periodBox.y - periodBox.height / 2)).toBeLessThanOrEqual(2);
-  await date.fill('2026-11-12');
+  await date.fill('2026-11-14');
   await expect(first.locator('.waste-total')).toHaveText(/^0\sCHF$/);
   await date.fill('2026-11-13');
   await expect(first.locator('.waste-total')).toHaveText(/^96 CHF$/);
@@ -271,7 +273,7 @@ test('waste dashboard ranks subgroups, reveals articles and keeps report control
   await expect(first.locator('.waste-total')).toHaveText(/^191 CHF$/);
   await expect(page.getByRole('columnheader', { name: 'Pertes au prix de vente (CHF)' })).toBeVisible();
   await select(dashboard, 'Évaluation des pertes', 'Prix d’achat (PA)');
-  await expect(summaries.nth(1)).toContainText('7 nov.');
+  await expect(summaries.nth(1)).toContainText('8 nov. – 14 novembre 2026');
   const week = 'Cette semaine (Semaine 47)';
   await select(summaries.nth(1), 'Période', week);
   await expect(summaries.nth(1)).toContainText('Aucune donnée pour cette période.');
@@ -385,7 +387,7 @@ test('waste dashboard ranks subgroups, reveals articles and keeps report control
   await trendMenu.getByRole('button', { name: 'Tout cocher' }).click();
   await trendMenu.getByRole('button', { name: 'Appliquer', exact: true }).click();
   await chart.press('End');
-  await expect(chart.getByRole('status')).toContainText('13 novembre');
+  await expect(chart.getByRole('status')).toContainText('14 novembre');
   await expect(chart.getByRole('status')).toContainText('Moyenne mobile');
   const heat = page.locator('.waste-heat');
   await expect(heat.getByRole('columnheader', { name: '8 nov.', exact: true })).toHaveCount(0);

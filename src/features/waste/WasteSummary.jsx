@@ -80,9 +80,10 @@ export function WasteSummary({ history, today, options }) {
   const [rankBy, setRankBy] = useState('subgroup');
   const [expanded, setExpanded] = useState(false);
   const disclosure = useExpandedRows();
+  const periodEnd = period === 'latest' ? history.latestRecorded : history.latest;
   const range = useMemo(() => period === 'date'
     ? (chosenDay && chosenDay >= history.first && chosenDay <= today ? [chosenDay, chosenDay] : null)
-    : periodRange(period, history.latest, today), [period, history.first, history.latest, today, chosenDay]);
+    : periodRange(period, periodEnd, today), [period, history.first, periodEnd, today, chosenDay]);
   const { total, breakdown, top } = useMemo(() => summary(history, range, rankBy), [history, range, rankBy]);
   const covered = hasCoverage(history, range);
   const coverageNote = range?.[1] > history.latest ? waste.partial(longDay(history.latest))
@@ -106,7 +107,7 @@ export function WasteSummary({ history, today, options }) {
               min={history.first} max={today} value={chosenDay} onChange={(event) => changeDate(setChosenDay, event.target.value)} />
           )}
         </div>
-        {period !== 'date' && <p className="waste-note">{rangeLabel(range)}</p>}
+        {period !== 'date' && range && <p className="waste-note">{rangeLabel(range)}</p>}
       </header>
       <p className="waste-total">{covered ? formatCurrency(total) : '—'}</p>
       {covered ? (
