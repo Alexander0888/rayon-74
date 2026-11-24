@@ -9,10 +9,18 @@ test('home, direct links, refresh, browser history and unknown addresses', async
   await expect(page).toHaveTitle('Manor | Rayon 74 · Fruits et légumes');
   const footer = page.getByRole('contentinfo');
   await expect(footer).toHaveText('Créé par nous, pour un avenir meilleur, ensemble.');
-  await expect(page.locator('.section-card')).toHaveCount(6);
-  await expect(page.getByText('En développement', { exact: true })).toHaveCount(3);
-  await expect(page.locator('.section-grid a')).toHaveCount(3);
-  await expect(page.locator('.section-planned a, .section-planned button')).toHaveCount(0);
+  const menu = page.getByRole('list', { name: 'Outils du rayon' });
+  const headings = menu.getByRole('heading');
+  await expect(headings).toHaveCount(16);
+  await expect(menu.getByRole('link').getByRole('heading')).toHaveText([
+    'Herbes fraîches', 'Analyse des déchets', 'Analyse des commandes',
+  ]);
+  await expect(headings.nth(3)).toHaveText('Visite virtuelle');
+  await expect(menu.getByText('En développement', { exact: true })).toHaveCount(13);
+  const visit = menu.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Visite virtuelle' }) });
+  await expect(visit).toContainText('En développement');
+  await expect(visit.getByRole('link')).toHaveCount(0);
+  await expect(menu.getByRole('article').getByRole('button')).toHaveCount(0);
   await noOverflow(page);
   await page.screenshot({ path: info.outputPath('home.png'), fullPage: true });
   await page.getByRole('link', { name: /Analyse des déchets/ }).click();
@@ -47,12 +55,32 @@ test('home, direct links, refresh, browser history and unknown addresses', async
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Plan du présentoir');
   await page.goForward();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Les outils du rayon');
-  await page.goto('/#/unknown');
+  await page.goto('/#/visit');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Page introuvable');
   await expect(footer).toBeVisible();
   await page.getByRole('link', { name: 'Retour à l’accueil' }).click();
   await expect(page).toHaveURL(/#\/$/);
   expect(errors).toEqual([]);
+});
+
+test('AI badges animate and the cards respect reduced motion', async ({ page }, info) => {
+  await page.goto('/');
+  const cards = page.getByRole('article').filter({ has: page.getByText('IA', { exact: true }) });
+  await expect(cards.getByRole('heading')).toHaveText([
+    'Commandes automatiques par IA', 'Posez toutes vos questions', 'Réassort des olives',
+  ]);
+  const card = cards.first();
+  const badge = card.getByText('IA', { exact: true });
+  await expect(badge).toHaveCSS('animation-duration', '3.6s');
+  await expect(badge).toHaveCSS('animation-iteration-count', 'infinite');
+  if (info.project.name === 'desktop') {
+    await card.hover();
+    await expect(card).toHaveCSS('animation-duration', '0.44s');
+    await expect(card).toHaveCSS('animation-iteration-count', '1');
+  }
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(badge).toHaveCSS('animation-name', 'none');
+  await expect(card).toHaveCSS('animation-name', 'none');
 });
 
 test('unsaved draft blocks Accueil and browser Back, with cancel and discard', async ({ page }) => {
@@ -192,6 +220,8 @@ test('responsive picker, grid and counters remain usable', async ({ page }, info
 
 test('keyboard selection and a narrow 320px screen', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto('/');
+  await noOverflow(page);
   await page.goto('/#/herbs');
   await openEditor(page);
   const picker = page.getByRole('combobox', { name: 'Herbe à placer', exact: true });
@@ -204,6 +234,7 @@ test('keyboard selection and a narrow 320px screen', async ({ page }) => {
   await filled(page, 37);
   await noOverflow(page);
   await page.getByRole('link', { name: 'Accueil', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await filled(page, 37);

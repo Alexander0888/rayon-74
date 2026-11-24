@@ -136,13 +136,60 @@ export const fr = {
   sectionsLabel: 'Outils du rayon',
   openSection: 'Ouvrir',
   inDevelopment: 'En développement',
+  aiBadge: 'IA',
   sections: {
     herbs: { title: 'Herbes fraîches', description: 'Consulter le plan du présentoir et préparer les modèles de mise en rayon.' },
-    visit: { title: 'Visite virtuelle', description: 'Explorer le rayon et retrouver les emplacements des produits.' },
     waste: { title: 'Analyse des déchets', description: 'Suivre les pertes pour mieux adapter la mise en rayon.' },
     orders: { title: 'Analyse des commandes', description: 'Consulter les produits commandés et les quantités confirmées.' },
-    labels: { title: 'Contrôle des étiquettes', description: 'Vérifier les prix et les informations affichées en rayon.' },
-    promotions: { title: 'Promotions', description: 'Retrouver les offres en cours et préparer leur mise en place.' },
+    visit: { title: 'Visite virtuelle', description: 'Explorer le rayon et retrouver les emplacements des produits.' },
+    automaticOrders: {
+      title: 'Commandes automatiques par IA',
+      description: 'À terme, l’IA croisera l’historique des commandes, les pertes et plus de 100 paramètres pour maximiser les ventes et limiter le gaspillage.',
+    },
+    chatbot: {
+      title: 'Posez toutes vos questions',
+      description: 'Demandez par exemple « Combien de tomates avons-nous commandées pour demain ? »',
+    },
+    promotionSigns: {
+      title: 'Commande automatique d’affichettes promotionnelles',
+      description: 'Commander automatiquement les affichettes nécessaires aux prochaines promotions.',
+    },
+    catalog: {
+      title: 'Catalogue des produits',
+      description: 'Retrouver le prix, le pays d’origine et le code de pesée de chaque produit.',
+    },
+    labels: {
+      title: 'Contrôle des pays d’origine',
+      description: 'Comparer automatiquement les pays affichés sur les étiquettes avec ceux des produits livrés et signaler les écarts.',
+    },
+    promotions: {
+      title: 'Promotions',
+      description: 'Retrouver les promotions en cours et repérer les affichettes qui ne sont plus valables.',
+    },
+    assortmentAlerts: {
+      title: 'Alertes assortiment et origine',
+      description: 'Être averti d’un changement d’origine, d’un produit indisponible ou d’un remplacement possible.',
+    },
+    oliveRestock: {
+      title: 'Réassort des olives',
+      description: 'Photographiez le présentoir d’olives. Le système commande automatiquement les produits à réapprovisionner.',
+    },
+    missingLabels: {
+      title: 'Commande d’étiquettes manquantes',
+      description: 'Repérer les produits sans étiquette et transmettre la liste au service décoration.',
+    },
+    qualityClaims: {
+      title: 'Réclamations qualité',
+      description: 'Photographiez le produit qui présente un défaut. La réclamation est remplie et envoyée automatiquement.',
+    },
+    simulation: {
+      title: 'Simulation du rayon',
+      description: 'Simuler la circulation des clients et le réassort des présentoirs.',
+    },
+    teamTasks: {
+      title: 'Tâches de l’équipe',
+      description: 'Attribuer les tâches, suivre leur réalisation et évaluer le travail effectué.',
+    },
   },
   notFoundTitle: 'Page introuvable',
   notFoundDescription: 'Cette adresse ne correspond à aucun outil du rayon.',
