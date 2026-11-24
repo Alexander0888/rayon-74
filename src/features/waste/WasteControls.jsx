@@ -143,7 +143,8 @@ export function visibleRows(rows, expanded, depth = 0) {
 }
 
 export function ReportLabel({ row, expanded, toggle, detail }) {
-  const text = <span>{row.label}{(row.reference || detail) && <small>{row.reference || detail}</small>}</span>;
+  const text = <span><span className="waste-report-title">{row.label}</span>
+    {(row.reference || detail) && <small>{row.reference || detail}</small>}</span>;
   if (!row.children.length) return <span className="waste-report-name">{text}</span>;
   return <button type="button" className="waste-report-name" aria-expanded={expanded.has(row.key)} onClick={() => toggle(row.key)}>
     <ChevronRight size={14} aria-hidden="true" />{text}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { waste } from '../../content/fr.js';
 import { graphDates, hasCoverage, isCovered, periodRange, summary } from './wasteData.js';
 import { formatCurrency, longDay, periodLabel, rangeLabel } from './wasteFormat.js';
@@ -65,9 +65,38 @@ function CategoryRing({ breakdown }) {
 
 function RankedRow({ row, disclosure, showCategory }) {
   const open = disclosure.expanded.has(row.key);
+  const label = useRef(null);
+  const [preview, setPreview] = useState(null);
+
+  function showName(input) {
+    const title = label.current.querySelector('.waste-report-title');
+    if (title.scrollWidth > title.clientWidth) {
+      setPreview((current) => input === 'touch' && current === 'touch' ? null : input);
+    }
+  }
+
+  useEffect(() => {
+    if (preview !== 'touch') return;
+    function dismiss(event) {
+      if (!label.current.contains(event.target)) setPreview(null);
+    }
+    document.addEventListener('pointerdown', dismiss);
+    return () => document.removeEventListener('pointerdown', dismiss);
+  }, [preview]);
+
   return <li>
     <div className="waste-ranking-row">
-      <ReportLabel row={row} {...disclosure} detail={showCategory ? row.category : undefined} />
+      <div className="waste-ranking-label" ref={label}
+        onPointerEnter={(event) => { if (event.pointerType === 'mouse') showName('mouse'); }}
+        onPointerLeave={(event) => { if (event.pointerType === 'mouse') setPreview(null); }}
+        onPointerDown={(event) => { if (event.isPrimary && event.pointerType !== 'mouse') showName('touch'); }}
+        onPointerCancel={() => setPreview(null)}
+        onFocus={(event) => { if (event.target.matches(':focus-visible')) showName('keyboard'); }}
+        onBlur={() => { if (preview === 'keyboard') setPreview(null); }}
+        onKeyDown={(event) => { if (event.key === 'Escape') setPreview(null); }}>
+        <ReportLabel row={row} {...disclosure} detail={showCategory ? row.category : undefined} />
+        {preview && <span className="waste-ranking-tooltip" aria-hidden="true">{row.label}</span>}
+      </div>
       <b>{formatCurrency(row.amount)}</b>
     </div>
     {open && <ul>{row.children.map((child) => <RankedRow key={child.key} row={child} disclosure={disclosure} />)}</ul>}

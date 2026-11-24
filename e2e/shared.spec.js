@@ -204,12 +204,13 @@ test('shared login persists through routes; publication updates a separate publi
 });
 
 test('waste dashboard ranks subgroups, reveals articles and keeps report controls independent', async ({ page }) => {
+  const longName = 'Pommes 1 sélection du verger, variété ancienne à chair croquante KG';
   const products = [
     [1, 'Aubergine CH', 'Légumes', 'Aubergines', 'Aubergines KG', '1001'],
     [2, 'Aubergine IMP', 'Légumes', 'Aubergines', 'Aubergines KG', '1002'],
     [3, 'Aubergine Bio', 'Légumes', 'Aubergines Bio', 'Aubergines Bio KG', '1003'],
     ...Array.from({ length: 10 }, (_, index) => [
-      index + 4, `Pomme ${index + 1}`, 'Fruits', 'Pommes', `Pommes ${index + 1} KG`,
+      index + 4, `Pomme ${index + 1}`, 'Fruits', 'Pommes', index === 0 ? longName : `Pommes ${index + 1} KG`,
     ]),
   ];
   const historical = Array.from({ length: 53 }, (_, index) => [
@@ -411,6 +412,58 @@ test('waste dashboard ranks subgroups, reveals articles and keeps report control
   await expect(heat.locator('tbody tr')).toHaveCount(0);
   await heat.getByLabel('Au', { exact: true }).fill('2026-10-30');
   await expect(heat.locator('tbody tr')).toHaveCount(50);
+
+  const longLabel = first.locator('.waste-ranking-label').filter({ hasText: longName });
+  const clippedTitle = longLabel.locator('.waste-report-title');
+  const fullTitle = longLabel.locator('.waste-ranking-tooltip');
+  await expect(clippedTitle).toHaveCSS('text-overflow', 'ellipsis');
+  await expect(clippedTitle).toHaveCSS('white-space', 'nowrap');
+  expect(await clippedTitle.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+  await clippedTitle.hover();
+  await expect(fullTitle).toHaveText(longName);
+  await first.getByRole('heading', { name: 'Top 10' }).hover();
+  await expect(fullTitle).toHaveCount(0);
+
+  await test.step('touch highlights clear on release and cancellation, and clipped names open on tap', async () => {
+    const touch = await page.context().newCDPSession(page);
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+    async function startTouch(target) {
+      await target.scrollIntoViewIfNeeded();
+      const { x, y, width, height } = await target.boundingBox();
+      await touch.send('Input.dispatchTouchEvent', {
+        type: 'touchStart', touchPoints: [{ x: Math.round(x + width / 2), y: Math.round(y + height / 2) }],
+      });
+    }
+
+    const cell = heat.locator('.waste-heat-cell').first();
+    const selection = heat.locator('.waste-heat-selection');
+    for (const viewport of [{ width: 390, height: 844 }, { width: 768, height: 1024 }]) {
+      await page.setViewportSize(viewport);
+      for (const type of ['touchEnd', 'touchCancel']) {
+        await startTouch(chart);
+        await expect(chart.getByRole('status')).toContainText('Moyenne mobile');
+        await touch.send('Input.dispatchTouchEvent', { type, touchPoints: [] });
+        await expect(chart.getByRole('status')).toHaveCount(0);
+
+        await startTouch(cell);
+        await expect(cell).toHaveAttribute('aria-pressed', 'true');
+        await expect(heat.locator('th.is-active')).toHaveCount(2);
+        await expect(selection).toContainText('CHF');
+        await touch.send('Input.dispatchTouchEvent', { type, touchPoints: [] });
+        await expect(cell).toHaveAttribute('aria-pressed', 'false');
+        await expect(heat.locator('th.is-active')).toHaveCount(0);
+        await expect(selection).toBeEmpty();
+      }
+
+      await startTouch(clippedTitle);
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await expect(fullTitle).toHaveText(longName);
+      await startTouch(first.getByRole('heading', { name: 'Top 10' }));
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await expect(fullTitle).toHaveCount(0);
+    }
+    await touch.detach();
+  });
 });
 
 test('a failed save during navigation keeps the draft and allows retry', async ({ page }) => {

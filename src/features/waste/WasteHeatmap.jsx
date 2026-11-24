@@ -54,6 +54,10 @@ export function WasteHeatmap({ history, today }) {
     setActive(null);
   }
 
+  function endContact(event) {
+    if (event.isPrimary && event.pointerType !== 'mouse') setActive(null);
+  }
+
   function navigate(event) {
     const change = directions[event.key];
     const button = event.target.closest('button[data-row]');
@@ -124,9 +128,17 @@ export function WasteHeatmap({ history, today }) {
                             style={color.style} data-row={rowIndex} data-day={dayIndex}
                             aria-label={`${row.label} · ${longDay(day)} · ${formatCurrency(amount)}`}
                             tabIndex={focused || (!currentRow && rowIndex === 0 && dayIndex === 0) ? 0 : -1}
-                            aria-pressed={focused} onFocus={select} onPointerEnter={(event) => {
+                            aria-pressed={focused} onFocus={(event) => {
+                              if (event.currentTarget.matches(':focus-visible')) select();
+                            }} onPointerEnter={(event) => {
                               if (event.pointerType === 'mouse') select();
-                            }} onClick={select} />
+                            }} onPointerDown={(event) => {
+                              if (!event.isPrimary) return;
+                              if (event.pointerType !== 'mouse') event.preventDefault();
+                              select();
+                            }} onPointerUp={endContact} onPointerCancel={endContact} onLostPointerCapture={endContact} onClick={(event) => {
+                              if (event.detail === 0 && !event.nativeEvent.pointerType) select();
+                            }} />
                         </td>
                       );
                     })}
