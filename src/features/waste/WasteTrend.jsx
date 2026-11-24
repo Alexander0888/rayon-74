@@ -146,10 +146,15 @@ export function WasteTrend({ points }) {
   }, [chosen, index, points, size]);
 
   function pick(event) {
+    if (!event.isPrimary) return;
     const { left, width, height } = event.currentTarget.getBoundingClientRect();
     const { x, right } = layout(width, height);
     const ratio = Math.min(1, Math.max(0, (event.clientX - left - x) / (right - x)));
     setSelectedDay(points[Math.round(ratio * (points.length - 1))]?.day ?? null);
+  }
+
+  function endContact(event) {
+    if (event.isPrimary && event.pointerType !== 'mouse') setSelectedDay(null);
   }
 
   function handleKey(event) {
@@ -175,6 +180,7 @@ export function WasteTrend({ points }) {
       <div className="waste-chart-frame" ref={frame} tabIndex={0} role="group" aria-label={waste.chartLabel}
         onKeyDown={handleKey} onPointerDown={pick}
         onPointerMove={(event) => { if (event.pointerType === 'mouse' || event.buttons) pick(event); }}
+        onPointerUp={endContact} onPointerCancel={endContact} onLostPointerCapture={endContact}
         onPointerLeave={(event) => { if (event.pointerType === 'mouse') setSelectedDay(null); }}>
         <canvas ref={canvas} aria-hidden="true" />
         {chosen && (

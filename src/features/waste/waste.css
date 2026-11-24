@@ -118,6 +118,21 @@
 .waste-ranking-row::before { content: ''; color: var(--waste-muted); }
 .waste-ranking ol > li > .waste-ranking-row::before { content: counter(ranking, decimal); }
 .waste-ranking-row b { font-weight: 650; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.waste-ranking-label { position: relative; min-width: 0; }
+.waste-ranking-label .waste-report-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.waste-ranking-tooltip {
+  position: absolute;
+  z-index: 3;
+  inset-inline: 0;
+  bottom: calc(100% + 4px);
+  padding: 6px 9px;
+  border: 1px solid var(--waste-line);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 4px 14px #243a3220;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
 .waste-ranking ul { margin-bottom: 4px; background: #f6f8f5; border-radius: 4px; }
 .waste-ranking ul ul { padding-left: 12px; }
 .waste-show-top { display: none; }
