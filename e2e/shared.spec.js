@@ -519,3 +519,36 @@ test('a failed save during navigation keeps the draft and allows retry', async (
     if (model) await store.deleteTemplate(model);
   }
 });
+
+test('the virtual visit serves simulations to guests and queries product data after manager login', async ({ page }) => {
+  test.setTimeout(60_000);
+  const requests = [];
+  page.on('request', (request) => {
+    if (request.url().endsWith('/rpc/get_cart_product_hud')) requests.push(request.postDataJSON().p_product);
+  });
+
+  await page.goto('/#/visit');
+  const draft = page.getByRole('dialog', { name: 'Visite virtuelle en développement' });
+  await expect(draft).toBeVisible();
+  await draft.getByRole('button', { name: 'Compris' }).click();
+  await expect(page.getByText('Mode démo', { exact: true })).toBeVisible();
+  const toggle = page.getByRole('button', { name: 'Mode HUD', exact: true });
+  const avocado = page.getByRole('button', { name: /Voir les données.*Avocat Hass/ });
+  await expect(toggle).toBeEnabled({ timeout: 30_000 });
+  await toggle.click();
+  await avocado.click();
+  await expect(page.getByText('Données de démonstration', { exact: true })).toBeVisible();
+  expect(requests).toEqual([]);
+
+  await login(page);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Se déconnecter', exact: true })).toBeVisible();
+  await expect(draft).toBeHidden();
+  await expect(page.getByText('Mode démo', { exact: true })).toBeHidden();
+  await expect(toggle).toBeEnabled({ timeout: 30_000 });
+  await toggle.click();
+  await avocado.click();
+  await expect(page.getByRole('heading', { name: 'Avocat Hass' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '7 jours' })).toBeVisible();
+  expect(requests).toEqual(['avocado']);
+});

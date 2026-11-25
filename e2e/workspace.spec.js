@@ -13,13 +13,14 @@ test('home, direct links, refresh, browser history and unknown addresses', async
   const headings = menu.getByRole('heading');
   await expect(headings).toHaveCount(16);
   await expect(menu.getByRole('link').getByRole('heading')).toHaveText([
-    'Herbes fraîches', 'Analyse des déchets', 'Analyse des commandes',
+    'Herbes fraîches', 'Analyse des déchets', 'Analyse des commandes', 'Visite virtuelle',
   ]);
   await expect(headings.nth(3)).toHaveText('Visite virtuelle');
   await expect(menu.getByText('En développement', { exact: true })).toHaveCount(13);
-  const visit = menu.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Visite virtuelle' }) });
+  const visit = menu.getByRole('link', { name: /Visite virtuelle/ });
   await expect(visit).toContainText('En développement');
-  await expect(visit.getByRole('link')).toHaveCount(0);
+  await expect(visit).toHaveAttribute('href', '#/visit');
+  await expect(visit).toHaveClass(/section-draft/);
   await expect(menu.getByRole('article').getByRole('button')).toHaveCount(0);
   await noOverflow(page);
   await page.screenshot({ path: info.outputPath('home.png'), fullPage: true });
@@ -55,12 +56,49 @@ test('home, direct links, refresh, browser history and unknown addresses', async
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Plan du présentoir');
   await page.goForward();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Les outils du rayon');
-  await page.goto('/#/visit');
+  await page.goto('/#/unknown');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Page introuvable');
   await expect(footer).toBeVisible();
   await page.getByRole('link', { name: 'Retour à l’accueil' }).click();
   await expect(page).toHaveURL(/#\/$/);
   expect(errors).toEqual([]);
+});
+
+test('the virtual visit opens the combined map and acknowledges its draft notice', async ({ page }) => {
+  test.setTimeout(60_000);
+  const draft = page.getByRole('dialog', { name: 'Visite virtuelle en développement' });
+  await page.goto('/');
+  await page.getByRole('link', { name: /Visite virtuelle/ }).click();
+  await expect(page).toHaveURL(/#\/visit$/);
+  await expect(draft).toBeVisible();
+  await expect(page.getByText('Mode démo', { exact: true })).toBeVisible();
+  await draft.getByRole('button', { name: 'Compris' }).click();
+  await expect(draft).toBeHidden();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Visite du rayon');
+
+  const supportsWebGL = await page.evaluate(() => {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    return Boolean(gl);
+  });
+  if (supportsWebGL) {
+    const walk = page.getByRole('button', { name: 'À pied', exact: true });
+    await expect(walk).toBeEnabled({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'Se placer près de la charrette' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Se placer près du présentoir de Noël' })).toBeEnabled();
+    await walk.click();
+    await expect(walk).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Avancer', exact: true }).click();
+  }
+  await noOverflow(page);
+  await page.getByRole('navigation', { name: 'Navigation' }).getByRole('link', { name: 'Accueil', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Les outils du rayon');
+  await page.goto('/#/visit/rayon');
+  await expect(page).toHaveURL(/#\/visit$/);
+  await expect(draft).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(draft).toBeHidden();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Visite du rayon');
 });
 
 test('AI badges animate and the cards respect reduced motion', async ({ page }, info) => {

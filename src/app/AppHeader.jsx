@@ -2,6 +2,21 @@ import { Leaf, LogIn, LogOut } from 'lucide-react';
 import { Link } from 'react-router';
 import { fr } from '../content/fr.js';
 
+export function DemoNotice({ signIn, pending = false }) {
+  return (
+    <div className="demo-notice">
+      <div className="page-width demo-notice-inner">
+        <p><strong>{fr.demoMode}</strong><span>{signIn ? fr.demoNotice : fr.demoDataOnly}</span></p>
+        {signIn && (
+          <button type="button" className="demo-sign-in" onClick={signIn} disabled={pending}>
+            {fr.signIn}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function AppHeader({ children, isDemo, signIn, signOut, pending = false }) {
   return (
     <header className="site-header">
@@ -25,16 +40,7 @@ export function AppHeader({ children, isDemo, signIn, signOut, pending = false }
           )}
         </div>
       </div>
-      {isDemo && (
-        <div className="demo-notice">
-          <div className="page-width demo-notice-inner">
-            <p><strong>{fr.demoMode}</strong><span>{fr.demoNotice}</span></p>
-            <button type="button" className="demo-sign-in" onClick={signIn} disabled={pending}>
-              {fr.signIn}
-            </button>
-          </div>
-        </div>
-      )}
+      {isDemo && <DemoNotice signIn={signIn} pending={pending} />}
     </header>
   );
 }

@@ -82,6 +82,17 @@ assert.equal(checked(await employee.rpc('get_orders_for_delivery', ordersDate)),
 assert.ok(Array.isArray(checked(await manager.rpc('get_orders_for_delivery', ordersDate)).lines));
 assert.ok((await manager.from('klarys_order_lines').select('id')).error);
 
+const hudProduct = { p_product: 'avocado' };
+assert.ok((await anonymous.rpc('get_cart_product_hud', hudProduct)).error);
+assert.equal(checked(await employee.rpc('get_cart_product_hud', hudProduct)), null);
+for (const product of ['avocado', 'pineapple', 'yellowDragon']) {
+  const hud = checked(await manager.rpc('get_cart_product_hud', { p_product: product }));
+  assert.match(hud.today, /^\d{4}-\d{2}-\d{2}$/);
+  for (const section of ['orders', 'waste', 'orderDays', 'wasteDays']) assert.ok(Array.isArray(hud[section]));
+  for (const row of hud.orders) assert.deepEqual(Object.keys(row).sort(), ['day', 'kind', 'quantity', 'unit']);
+}
+assert.equal((await manager.rpc('get_cart_product_hud', { p_product: 'other' })).error?.code, '22023');
+
 assert.ok((await manager.from('published_plan').update({ applied_at: '2020-01-01Z' }).eq('id', 1)).error);
 let testModel;
 try {

@@ -1,4 +1,4 @@
-import { createHashRouter } from 'react-router';
+import { createHashRouter, Navigate } from 'react-router';
 import App from '../App.jsx';
 import HomePage from '../pages/HomePage.jsx';
 import HerbsPage from '../features/herbs/HerbsPage.jsx';
@@ -19,6 +19,9 @@ export const router = createHashRouter([
     children: [
       { index: true, Component: HomePage },
       { path: 'herbs', Component: HerbsPage },
+      { path: 'visit', lazy: async () => ({ Component: (await import('../features/visit/christmas/ChristmasPage.jsx')).DepartmentPage }) },
+      { path: 'visit/noel', lazy: async () => ({ Component: (await import('../features/visit/christmas/ChristmasPage.jsx')).default }) },
+      { path: 'visit/rayon', element: <Navigate to="/visit" replace /> },
       { path: 'waste', lazy: async () => ({ Component: (await import('../features/waste/WastePage.jsx')).default }) },
       { path: 'orders', lazy: async () => ({ Component: (await import('../features/orders/OrdersPage.jsx')).default }) },
       { path: '*', Component: NotFoundPage },

@@ -11,7 +11,7 @@ const sections = [
   { id: 'herbs', Icon: Leaf, to: '/herbs' },
   { id: 'waste', Icon: ChartNoAxesColumn, to: '/waste' },
   { id: 'orders', Icon: ClipboardList, to: '/orders' },
-  { id: 'visit', Icon: Map },
+  { id: 'visit', Icon: Map, to: '/visit', draft: true },
   { id: 'automaticOrders', Icon: ShoppingCart, ai: true },
   { id: 'chatbot', Icon: MessageCircle, ai: true },
   { id: 'promotionSigns', Icon: Tags },
@@ -40,11 +40,12 @@ export default function HomePage() {
         </header>
         {account.signOutError && <p className="notice error" role="alert">{fr.connectionError}</p>}
         <ul className="section-grid" aria-label={fr.sectionsLabel}>
-          {sections.map(({ id, Icon, to, ai }) => {
+          {sections.map(({ id, Icon, to, ai, draft }) => {
             const { title, description } = fr.sections[id];
             const Card = to ? Link : 'article';
             const classes = ['section-card', to ? 'section-ready' : 'section-planned'];
             if (ai) classes.push('section-ai');
+            if (draft) classes.push('section-draft');
 
             return (
               <li key={id}>
@@ -54,6 +55,7 @@ export default function HomePage() {
                   <h2>{title}</h2>
                   <p>{description}</p>
                   <span className="section-status">
+                    {draft && <span className="section-draft-status">{fr.inDevelopment}</span>}
                     {to ? <span className="section-open">{fr.openSection}<ArrowRight size={17} aria-hidden="true" /></span> : fr.inDevelopment}
                   </span>
                 </Card>
