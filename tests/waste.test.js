@@ -99,3 +99,23 @@ test('ranking sums francs and cents before comparing and rounds only at display'
   assert.equal(formatCurrency(top[0].amount), '61\u00a0CHF');
   assert.equal(formatCurrency(-40), '0\u00a0CHF');
 });
+
+test('the work calendar applies to totals and separates a covered zero from an unloaded day', () => {
+  const saturday = '2026-11-21';
+  const sunday = '2026-11-22';
+  const monday = '2026-11-23';
+  const tuesday = '2026-11-24';
+  const catalog = [[1, 'Orange', 'Fruits', 'Oranges', 'Oranges KG']];
+  const work = buildHistory({
+    coverage: [[saturday, monday]], products: catalog,
+    entries: [[saturday, 1, 600], [sunday, 1, 9000]],
+  });
+  assert.equal(summary(work, [saturday, monday], 'group').total, 600);
+  assert.equal(work.latestRecorded, saturday);
+  const demo = buildHistory({
+    coverage: [[saturday, monday]], days: [saturday, monday], products: catalog, entries: [[0, 1, 600]],
+  });
+  assert.deepEqual(trend(demo, [saturday, tuesday], new Set(['Fruits']), 7).map(({ day, amount }) => [day, amount]), [
+    [saturday, 600], [monday, 0], [tuesday, null],
+  ]);
+});

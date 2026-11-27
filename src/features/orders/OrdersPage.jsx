@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, Search } from 'lucide-react';
 import { useOutletContext } from 'react-router';
 import { AppHeader } from '../../app/AppHeader.jsx';
-import { shiftDay } from '../../app/calendar.js';
+import { isSunday, shiftDay } from '../../app/calendar.js';
 import { SectionBreadcrumb } from '../../app/SectionBreadcrumb.jsx';
 import { ChoiceSelect } from '../../components/ChoiceSelect.jsx';
 import { fr, locale, orders, pageTitle } from '../../content/fr.js';
 import { supabase } from '../../services/supabase.js';
 import {
-  categoryKeys, groupOrdersByDay, initialDeliveryDay, isBio, orderOrigin, orderSummaries, packageLabel, priceLabel, quantityLabel,
+  categoryKeys, groupOrdersByDay, initialDeliveryDay, isBio, orderOrigin, orderSummaries, packageLabel, priceLabel, quantityLabel, readDemoOrders,
 } from './ordersData.js';
 import './orders.css';
 
@@ -27,7 +27,7 @@ async function loadDeliveryDay(date, signal) {
 
 async function loadDeliveryPeriod(from, to, signal) {
   const first = await loadDeliveryDay(from, signal);
-  const deliveries = [{ date: from, lines: first.lines }];
+  const deliveries = isSunday(from) ? [] : [{ date: from, lines: first.lines }];
   const end = first.latestDate && first.latestDate < to ? first.latestDate : to;
   let date = from;
   while (first.latestDate && date < end) {
@@ -35,13 +35,21 @@ async function loadDeliveryPeriod(from, to, signal) {
     const batch = [];
     while (batch.length < batchSize && date < end) {
       date = shiftDay(date, 1);
-      batch.push(date);
+      if (!isSunday(date)) batch.push(date);
     }
     deliveries.push(...await Promise.all(batch.map(async (date) => ({
       date, lines: (await loadDeliveryDay(date, signal)).lines,
     }))));
   }
   return { latestDate: first.latestDate, deliveries };
+}
+
+async function loadDemoOrders(from, to, filters, signal) {
+  const { data, error } = await supabase.rpc('get_demo_orders', {
+    p_from: from, p_to: to, p_query: filters.query, p_sort: filters.sort, p_offsets: filters.offsets,
+  }).abortSignal(signal);
+  if (error || !Array.isArray(data?.lines)) throw new Error(orders.loadError);
+  return readDemoOrders(data);
 }
 
 function showCalendar(event) {
@@ -104,7 +112,7 @@ function OrdersCell({ column, className = '', children }) {
   );
 }
 
-function OrderRow({ line }) {
+function OrderRow({ line, isDemo }) {
   const cancelled = line.counting_status === 'cancelled';
   const pending = !cancelled && line.validated_quantity == null;
   const adjusted = !cancelled && !pending && (Number(line.validated_quantity) !== Number(line.ordered_quantity)
@@ -113,6 +121,9 @@ function OrderRow({ line }) {
     <tr role="row" className={cancelled ? 'orders-cancelled' : undefined}>
       <th role="rowheader" scope="row" className="orders-product">
         <span>{line.product_name}</span>
+        {isDemo && <small className="orders-reference" title={[line.manor_article, line.internal_ref, line.gtin].join(' · ')}>
+          {line.manor_variant}
+        </small>}
         {isBio(line) && <span className="orders-bio">{orders.bio}</span>}
         {cancelled && <span className="orders-cancelled-label">{orders.cancelled}</span>}
       </th>
@@ -133,7 +144,7 @@ function OrderRow({ line }) {
   );
 }
 
-function OrderGroup({ category, days, totals, multipleDays }) {
+function OrderGroup({ category, days, totals, multipleDays, pager }) {
   const heading = `orders-${category}`;
   return (
     <section className="orders-group" aria-labelledby={heading}>
@@ -152,11 +163,20 @@ function OrderGroup({ category, days, totals, multipleDays }) {
               <thead role="rowgroup"><tr role="row">
                 {columns.map((column) => <th key={column} role="columnheader" scope="col">{orders[column]}</th>)}
               </tr></thead>
-              <tbody role="rowgroup">{lines.map((line) => <OrderRow key={line.id} line={line} />)}</tbody>
+              <tbody role="rowgroup">{lines.map((line) => <OrderRow key={line.id} line={line} isDemo={Boolean(pager)} />)}</tbody>
             </table>
           </div>
         );
       }) : <p className="orders-empty-group">{orders.emptyGroup}</p>}
+      {pager?.total > pager?.size && (
+        <nav className="orders-pages" aria-label={orders.groups[category]}>
+          <span aria-live="polite">{orders.lineRange(pager.offset + 1, Math.min(pager.offset + pager.size, pager.total), pager.total)}</span>
+          <button type="button" className="button filter-control" disabled={pager.pending || pager.offset === 0}
+            onClick={() => pager.change(pager.offset - pager.size)}>{orders.previousPage}</button>
+          <button type="button" className="button filter-control" disabled={pager.pending || pager.offset + pager.size >= pager.total}
+            onClick={() => pager.change(pager.offset + pager.size)}>{orders.nextPage}</button>
+        </nav>
+      )}
     </section>
   );
 }
@@ -188,7 +208,7 @@ function SummaryRow({ label, totals }) {
   );
 }
 
-function CategorySummary({ totals }) {
+function CategorySummary({ totals, groups }) {
   return (
     <section className="orders-summary-section" aria-labelledby="orders-summary-title">
       <h2 id="orders-summary-title">{orders.summary}</h2>
@@ -201,7 +221,7 @@ function CategorySummary({ totals }) {
           </tr>
         </thead>
         <tbody>
-          {categoryKeys.map((category) => (
+          {groups.map((category) => (
             <SummaryRow key={category} label={orders.groups[category]} totals={totals.categories[category]} />
           ))}
         </tbody>
@@ -213,13 +233,16 @@ function CategorySummary({ totals }) {
   );
 }
 
-function OrdersDashboard() {
+function OrdersDashboard({ isDemo }) {
   const [from, setFrom] = useState(initialDeliveryDay);
   const [endDate, setEndDate] = useState(null);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('nameAsc');
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState(null);
+  const [offsets, setOffsets] = useState({});
+  const serverQuery = isDemo ? query.trim() : '';
+  const serverSort = isDemo ? sort : 'nameAsc';
   const to = endDate ?? from;
   const hasDates = isDeliveryDate(from) && isDeliveryDate(to);
   const invalidPeriod = hasDates && to < from;
@@ -230,23 +253,47 @@ function OrdersDashboard() {
     if (!valid) return;
     const controller = new AbortController();
     async function load() {
+      const request = { from, to, attempt, serverQuery, serverSort, offsets };
       try {
-        const data = await loadDeliveryPeriod(from, to, controller.signal);
-        if (!controller.signal.aborted) setResult({ from, to, attempt, data });
+        const data = isDemo ? await loadDemoOrders(from, to, {
+          query: serverQuery, sort: serverSort, offsets,
+        }, controller.signal) : await loadDeliveryPeriod(from, to, controller.signal);
+        if (!controller.signal.aborted) setResult({ ...request, data });
       } catch {
-        if (!controller.signal.aborted) setResult({ from, to, attempt, error: true });
+        if (!controller.signal.aborted) setResult({ ...request, error: true });
       }
     }
-    void load();
-    return () => controller.abort();
-  }, [from, to, valid, attempt]);
+    // Debounce the server-side search while typing in a multi-month report.
+    const timer = setTimeout(load, serverQuery ? 160 : 0);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [from, to, valid, attempt, isDemo, serverQuery, serverSort, offsets]);
 
-  const current = result?.from === from && result.to === to && result.attempt === attempt ? result : null;
+  const current = result?.from === from && result.to === to && result.attempt === attempt &&
+    result.serverQuery === serverQuery && result.serverSort === serverSort ? result : null;
   const data = current?.data;
-  const grouped = useMemo(() => data && groupOrdersByDay(data.deliveries, query, sort), [data, query, sort]);
-  const totals = useMemo(() => data && orderSummaries(data.deliveries), [data]);
-  const hasLines = data?.deliveries.some(({ lines }) => lines.length > 0);
+  const grouped = useMemo(() => data && (isDemo ? data.grouped : groupOrdersByDay(data.deliveries, query, sort)), [data, isDemo, query, sort]);
+  const totals = useMemo(() => data && (isDemo ? data.totals : orderSummaries(data.deliveries)), [data, isDemo]);
+  const hasLines = data && (isDemo ? data.hasLines : data.deliveries.some(({ lines }) => lines.length > 0));
   const hasMatches = grouped && Object.values(grouped).some((days) => days.length);
+  const groups = isDemo && totals?.categories.unclassified.ordered.size ? [...categoryKeys, 'unclassified'] : categoryKeys;
+
+  function update(setValue, value) {
+    if (isDemo) setOffsets({});
+    setValue(value);
+  }
+
+  function pager(category) {
+    if (!isDemo) return undefined;
+    const label = orders.groups[category];
+    return {
+      offset: current.offsets[label] ?? 0, total: data.counts[label] ?? 0, size: data.pageSize,
+      pending: current.offsets !== offsets,
+      change: (offset) => setOffsets({ ...offsets, [label]: offset }),
+    };
+  }
 
   function jumpTo(category) {
     const heading = document.getElementById(`orders-${category}`);
@@ -259,22 +306,23 @@ function OrdersDashboard() {
       <div className="orders-overview">
         <div className="orders-toolbar">
           <div className="orders-controls">
-            <DeliveryControls from={from} to={endDate} onFrom={setFrom} onTo={setEndDate}
-              onToggle={() => setEndDate(endDate === null ? from : null)} invalid={invalidPeriod} />
+            <DeliveryControls from={from} to={endDate} onFrom={(value) => update(setFrom, value)}
+              onTo={(value) => update(setEndDate, value)} onToggle={() => update(setEndDate, endDate === null ? from : null)}
+              invalid={invalidPeriod} />
             <label className="orders-field">{orders.search}
               <span className="orders-search">
                 <Search size={16} aria-hidden="true" />
                 <input type="search" className="filter-control" value={query} placeholder={orders.searchPlaceholder}
-                  onChange={(event) => setQuery(event.target.value)} />
+                  onChange={(event) => update(setQuery, event.target.value)} />
               </span>
             </label>
             <div className="orders-field">
               <span aria-hidden="true">{orders.sortLabel}</span>
-              <ChoiceSelect label={orders.sortLabel} options={sortOptions} value={sort} onSelect={setSort} />
+              <ChoiceSelect label={orders.sortLabel} options={sortOptions} value={sort} onSelect={(value) => update(setSort, value)} />
             </div>
           </div>
           <nav className="orders-jump" aria-label={orders.jumpLabel}>
-            {categoryKeys.map((category) => (
+            {groups.map((category) => (
               <button className="button orders-jump-button" key={category} type="button" disabled={!hasMatches}
                 onClick={() => jumpTo(category)}>
                 {orders.groups[category]}<ArrowDown size={14} aria-hidden="true" />
@@ -282,7 +330,7 @@ function OrdersDashboard() {
             ))}
           </nav>
         </div>
-        {hasLines && <CategorySummary totals={totals} />}
+        {hasLines && <CategorySummary totals={totals} groups={groups} />}
       </div>
       {!hasDates && <p className="orders-message" role="status">{endDate === null ? orders.chooseDate : orders.choosePeriod}</p>}
       {invalidPeriod && <p className="orders-message" role="status">{orders.invalidPeriod}</p>}
@@ -294,14 +342,14 @@ function OrdersDashboard() {
       {data && !hasLines && <div className="orders-message" role="status">
         <p>{multipleDays ? orders.emptyPeriod : orders.empty}</p>
         {data.latestDate && (data.latestDate < from || data.latestDate > to) && <button className="button" type="button"
-          onClick={() => { setFrom(data.latestDate); setEndDate(null); }}>{orders.latest}</button>}
+          onClick={() => { update(setFrom, data.latestDate); setEndDate(null); }}>{isDemo ? orders.latestDemo : orders.latest}</button>}
       </div>}
       {hasLines && !hasMatches && <p className="orders-message" role="status">{orders.noMatches}</p>}
       {hasMatches && <div className="orders-groups">
-        {categoryKeys.map((category) => <OrderGroup key={category} category={category} days={grouped[category]}
-          totals={totals.categories[category]} multipleDays={multipleDays} />)}
-        {grouped.unclassified.length > 0 && <OrderGroup category="unclassified" days={grouped.unclassified}
-          totals={totals.categories.unclassified} multipleDays={multipleDays} />}
+        {[...new Set([...groups, ...(grouped.unclassified.length ? ['unclassified'] : [])])].map((category) => (
+          <OrderGroup key={category} category={category} days={grouped[category]} totals={totals.categories[category]}
+            multipleDays={multipleDays} pager={pager(category)} />
+        ))}
       </div>}
     </>
   );
@@ -317,8 +365,9 @@ export default function OrdersPage() {
         <SectionBreadcrumb title={title} />
         <header className="page-heading orders-heading"><h1>{title}</h1></header>
         {account.signOutError && <p className="notice error" role="alert">{fr.connectionError}</p>}
-        {supabase && account.canEdit ? <OrdersDashboard key={account.workspaceKey} />
-          : <p className="orders-message" role="status">{supabase ? orders.access : orders.unavailable}</p>}
+        {supabase && (account.canEdit || account.isDemo)
+          ? <OrdersDashboard key={account.workspaceKey} isDemo={account.isDemo} />
+          : <p className="orders-message" role="status">{account.accessPending ? fr.loading : supabase ? orders.access : orders.unavailable}</p>}
       </main>
     </>
   );

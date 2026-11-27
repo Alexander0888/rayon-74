@@ -1,3 +1,4 @@
+import { todayInZurich } from '../src/app/calendar.js';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -65,9 +66,19 @@ assert.ok((await anonymous.from('waste_products').select('variant')).error);
 assert.ok((await anonymous.from('waste_daily').select('recorded_on')).error);
 assert.ok((await anonymous.schema('waste_demo').from('entries').select('recorded_on')).error);
 assert.ok((await anonymous.schema('waste_demo').rpc('generate_days')).error);
-const guestWaste = checked(await anonymous.rpc('get_waste_demo_dashboard'));
-assert.deepEqual(Object.keys(guestWaste).sort(), ['coverage', 'entries', 'products']);
-assert.deepEqual(checked(await anonymous.rpc('get_waste_demo_dashboard')), guestWaste);
+assert.ok((await anonymous.schema('rayon_demo').from('products').select('order_key')).error);
+assert.ok((await anonymous.schema('rayon_demo').rpc('generate_history')).error);
+assert.ok((await employee.from('waste_daily').select('recorded_on')).data?.length === 0);
+assert.ok((await employee.rpc('get_demo_waste_report')).error);
+const guestWaste = checked(await anonymous.rpc('get_demo_waste_report'));
+assert.deepEqual(Object.keys(guestWaste).sort(), ['coverage', 'days', 'entries', 'products']);
+assert.deepEqual(checked(await anonymous.rpc('get_demo_waste_report')), guestWaste);
+const legacyWaste = checked(await anonymous.rpc('get_waste_demo_dashboard'));
+assert.deepEqual(legacyWaste.products, guestWaste.products);
+assert.equal(legacyWaste.entries.length, guestWaste.entries.length);
+if (legacyWaste.entries.length) {
+  assert.equal(legacyWaste.entries[0][0], guestWaste.days[guestWaste.entries[0][0]]);
+}
 const realArticles = new Set(wasteSnapshot.products.map((product) => product[5].replace(/[^0-9]/g, '')));
 const demoArticles = new Set(guestWaste.products.map((product) => product[5]));
 assert.equal(demoArticles.size, guestWaste.products.length);
@@ -92,6 +103,27 @@ for (const product of ['avocado', 'pineapple', 'yellowDragon']) {
   for (const row of hud.orders) assert.deepEqual(Object.keys(row).sort(), ['day', 'kind', 'quantity', 'unit']);
 }
 assert.equal((await manager.rpc('get_cart_product_hud', { p_product: 'other' })).error?.code, '22023');
+const today = todayInZurich();
+const demoPeriod = { p_from: today, p_to: today };
+assert.ok((await employee.rpc('get_demo_orders', demoPeriod)).error);
+assert.ok((await employee.rpc('get_demo_product_hud', hudProduct)).error);
+assert.ok((await manager.rpc('get_demo_orders', demoPeriod)).error);
+assert.ok((await manager.rpc('get_demo_product_hud', hudProduct)).error);
+assert.ok((await anonymous.from('klarys_orders').select('id')).error);
+assert.ok((await employee.from('klarys_order_lines').select('id')).error);
+const guestOrders = checked(await anonymous.rpc('get_demo_orders', demoPeriod));
+assert.ok(Array.isArray(guestOrders.lines));
+assert.ok(guestOrders.lines.every(({ manor_variant }) => demoArticles.has(manor_variant)));
+if (guestWaste.products.length) {
+  for (const alias of ['avocado', 'pineapple', 'yellowDragon']) {
+    const snapshot = checked(await anonymous.rpc('get_demo_product_hud', { p_product: alias }));
+    assert.ok(snapshot.waste.length > 0);
+    assert.ok(demoArticles.has(snapshot.manorVariant));
+    assert.deepEqual(checked(await anonymous.rpc('get_demo_product_hud', { p_product: String(snapshot.productId) })), snapshot);
+  }
+  const extra = guestWaste.products.find(([id]) => id != null)[0];
+  assert.ok(checked(await anonymous.rpc('get_demo_product_hud', { p_product: String(extra) })).name);
+}
 
 assert.ok((await manager.from('published_plan').update({ applied_at: '2020-01-01Z' }).eq('id', 1)).error);
 let testModel;

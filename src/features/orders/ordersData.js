@@ -2,7 +2,7 @@ import { isSunday, shiftDay, todayInZurich } from '../../app/calendar.js';
 import { locale, orders } from '../../content/fr.js';
 
 export const categoryKeys = Object.keys(orders.groups).filter((key) => key !== 'unclassified');
-const categoryByLabel = new Map(categoryKeys.map((key) => [orders.groups[key], key]));
+const categoryByLabel = new Map(Object.entries(orders.groups).map(([key, label]) => [label, key]));
 
 export function initialDeliveryDay(now) {
   const day = todayInZurich(now);
@@ -70,16 +70,40 @@ export function orderSummaries(deliveries) {
   };
 }
 
-export function orderTotals(lines) {
-  const totals = { ordered: new Map(), confirmed: new Map(), pending: new Map() };
-  function add(group, unit, quantity) {
-    group.set(unit, (group.get(unit) ?? 0) + Number(quantity));
+const emptyTotals = () => ({ ordered: new Map(), confirmed: new Map(), pending: new Map() });
+function addQuantity(totals, key, unit, quantity) {
+  totals[key].set(unit, (totals[key].get(unit) ?? 0) + Number(quantity));
+}
+
+export function readDemoOrders({ latestDate, lines, totals, counts, pageSize, hasLines }) {
+  const categories = Object.fromEntries(Object.keys(orders.groups).map((key) => [key, emptyTotals()]));
+  const total = emptyTotals();
+  const daysByCategory = Object.fromEntries(Object.keys(orders.groups).map((key) => [key, new Map()]));
+  for (const [label, kind, unit, quantity] of totals) {
+    addQuantity(categories[categoryByLabel.get(label) ?? 'unclassified'], kind, unit, quantity);
+    addQuantity(total, kind, unit, quantity);
   }
   for (const line of lines) {
+    const days = daysByCategory[orderCategory(line)];
+    if (!days.has(line.day)) days.set(line.day, []);
+    days.get(line.day).push(line);
+  }
+  return {
+    latestDate, counts, pageSize, hasLines,
+    totals: { categories, total },
+    grouped: Object.fromEntries(Object.entries(daysByCategory).map(([key, days]) => [
+      key, [...days].map(([date, lines]) => ({ date, lines })),
+    ])),
+  };
+}
+
+export function orderTotals(lines) {
+  const totals = emptyTotals();
+  for (const line of lines) {
     if (line.counting_status !== 'active') continue;
-    add(totals.ordered, line.ordered_unit_id, line.ordered_quantity);
-    if (line.validated_quantity == null) add(totals.pending, line.ordered_unit_id, line.ordered_quantity);
-    else add(totals.confirmed, line.validated_unit_id, line.validated_quantity);
+    addQuantity(totals, 'ordered', line.ordered_unit_id, line.ordered_quantity);
+    if (line.validated_quantity == null) addQuantity(totals, 'pending', line.ordered_unit_id, line.ordered_quantity);
+    else addQuantity(totals, 'confirmed', line.validated_unit_id, line.validated_quantity);
   }
   return totals;
 }

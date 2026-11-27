@@ -1,4 +1,4 @@
-import { shiftDay, todayInZurich } from '../../../app/calendar.js';
+import { isSunday, shiftDay } from '../../../app/calendar.js';
 
 function quantities(rows) {
   const totals = new Map();
@@ -19,17 +19,20 @@ function byDay(rows) {
 }
 
 export function summarizeProduct(snapshot, period) {
-  const { today, orders, waste, orderDays, wasteDays, wasteUnit } = snapshot;
+  const { today, orderDays, wasteDays, wasteUnit } = snapshot;
+  const orders = snapshot.orders.filter(({ day }) => !isSunday(day));
+  const waste = snapshot.waste.filter(({ day }) => !isSunday(day));
+  const workingDays = Array.from({ length: period }, (_, index) => shiftDay(today, index - period + 1))
+    .filter((day) => !isSunday(day));
   const start = shiftDay(today, 1 - period);
-  const inPeriod = (day) => day >= start && day <= today;
+  const inPeriod = (day) => day >= start && day <= today && !isSunday(day);
   const past = byDay(orders.filter(({ day, kind }) => day < today && kind === 'confirmed'));
   const ordered = orders.filter(({ kind }) => kind === 'ordered');
   const planned = byDay(ordered.filter(({ day }) => day >= today));
   const todayConfirmed = orders.filter(({ day, kind }) => day === today && kind === 'confirmed');
 
   const zeroWaste = wasteUnit ? [{ unit: wasteUnit, quantity: 0 }] : [];
-  const preTodayWaste = byDay(waste.filter(({ day }) => day >= start && day < today));
-  const todayWaste = quantities(waste.filter(({ day }) => day === today));
+  const wasteByDay = byDay(waste.filter(({ day }) => inPeriod(day)));
   const knownWasteDay = new Set(wasteDays);
   const commonDays = new Set(orderDays.filter((day) => inPeriod(day) && knownWasteDay.has(day)));
   const comparableOrders = quantities(ordered.filter(({ day }) => commonDays.has(day)));
@@ -48,37 +51,20 @@ export function summarizeProduct(snapshot, period) {
     orderRows: [
       ...[...past].sort(([a], [b]) => a.localeCompare(b)).slice(-3)
         .map(([day, values]) => ({ day, phase: 'past', values: quantities(values) })),
-      { day: today, phase: 'today', values: quantities(todayConfirmed.length ? todayConfirmed : planned.get(today) ?? []) },
+      ...(!isSunday(today) ? [{
+        day: today, phase: 'today', values: quantities(todayConfirmed.length ? todayConfirmed : planned.get(today) ?? []),
+      }] : []),
       ...[...planned].filter(([day]) => day > today).sort(([a], [b]) => a.localeCompare(b))
         .map(([day, values]) => ({ day, phase: 'future', values: quantities(values) })),
     ],
-    wasteRows: [
-      ...[...preTodayWaste].sort(([a], [b]) => a.localeCompare(b))
-        .map(([day, values]) => ({ day, phase: 'past', values: quantities(values) })),
-      { day: today, phase: 'today', values: todayWaste.length || !knownWasteDay.has(today) ? todayWaste : zeroWaste },
-    ],
+    wasteRows: workingDays.map((day) => ({
+      day, phase: day === today ? 'today' : 'past',
+      values: wasteByDay.has(day) ? quantities(wasteByDay.get(day)) : knownWasteDay.has(day) ? zeroWaste : [],
+    })),
     totalWaste: totalWaste.length || !wasteDays.some(inPeriod) ? totalWaste : zeroWaste,
     totalOrders: quantities(ordered.filter(({ day }) => inPeriod(day))),
     percentage,
     comparedDays: commonDays.size,
+    workingDays: workingDays.length,
   };
-}
-
-export function demoProduct(product, today = todayInZurich()) {
-  const demo = {
-    pineapple: { boxes: [4, 3, 5], pack: 8, waste: [3, 2, 1] },
-    avocado: { boxes: [3, 2, 4], pack: 16, waste: [5, 2, 3] },
-    yellowDragon: { boxes: [2, 1, 3], pack: 7, waste: [1, 2, 1] },
-  }[product];
-  const past = [-24, -15, -9, -6, -3, -1];
-  const orders = [...past, 0, 2, 4, 7].flatMap((offset, index) => {
-    const day = shiftDay(today, offset);
-    const amount = { day, unit: 'PCE', quantity: demo.boxes[index % 3] * demo.pack };
-    return offset < 0 ? [{ ...amount, kind: 'ordered' }, { ...amount, kind: 'confirmed' }] : [{ ...amount, kind: 'ordered' }];
-  });
-  const waste = past.map((offset, index) => ({
-    day: shiftDay(today, offset), unit: 'PCE', quantity: demo.waste[index % 3],
-  }));
-  const covered = Array.from({ length: 30 }, (_, index) => shiftDay(today, index - 29));
-  return { today, orders, waste, orderDays: covered, wasteDays: covered, wasteUnit: 'PCE' };
 }

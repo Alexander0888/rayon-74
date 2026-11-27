@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowDownUp, ArrowUp, Search } from 'lucide-react';
 import { waste } from '../../content/fr.js';
-import { allCategories, categories, compareNames, groupKey, hasCoverage, periodRange, subgroupRows, tableRows } from './wasteData.js';
+import { allCategories, compareNames, groupKey, hasCoverage, periodRange, subgroupRows, tableRows } from './wasteData.js';
 import { CategoryFilter, FilterMenu, PeriodFilter, ReportLabel, selectedRange, useExpandedRows, visibleRows } from './WasteControls.jsx';
 import { formatCurrency, rangeLabel } from './wasteFormat.js';
 
@@ -18,7 +18,7 @@ function SortColumn({ field, label, order, onSort }) {
 export function WasteTable({ history, today, metric }) {
   const [period, setPeriod] = useState('last30');
   const [custom, setCustom] = useState(() => periodRange('last30', history.latest, today));
-  const [selected, setSelected] = useState(allCategories);
+  const [selected, setSelected] = useState(() => allCategories(history.categories));
   const [groups, setGroups] = useState(null);
   const [query, setQuery] = useState('');
   const [order, setOrder] = useState({ field: 'amount', direction: 'descending' });
@@ -66,14 +66,14 @@ export function WasteTable({ history, today, metric }) {
         <table aria-labelledby="waste-detail-title">
           <thead><tr>
             <SortColumn field="label" label={waste.product} order={order} onSort={sortBy} />
-            <th scope="col"><CategoryFilter column selected={selected} onChange={(next) => {
+            <th scope="col"><CategoryFilter column available={history.categories} selected={selected} onChange={(next) => {
               setSelected(next);
               setGroups(null);
               clear();
             }} /></th>
             <th scope="col"><FilterMenu label={waste.group} caption={waste.group} options={groupOptions}
               selected={groups ?? new Set(groupOptions.map(({ id }) => id))} onChange={setGroups}
-              allLabel={waste.allGroups} disabled={selected.size === categories.length || !groupOptions.length} /></th>
+              allLabel={waste.allGroups} disabled={selected.size === history.categories.length || !groupOptions.length} /></th>
             <SortColumn field="amount" label={waste.lossColumn[metric]} order={order} onSort={sortBy} />
           </tr></thead>
           <tbody>

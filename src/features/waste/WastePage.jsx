@@ -17,10 +17,10 @@ import './waste.css';
 function WasteDashboard({ snapshot, isDemo }) {
   const today = todayInZurich();
   const [metric, setMetric] = useState('pa');
-  const history = useMemo(() => buildHistory(snapshot, metric, isDemo), [snapshot, metric, isDemo]);
+  const history = useMemo(() => buildHistory(snapshot, metric), [snapshot, metric]);
   const [period, setPeriod] = useState('last30');
   const [custom, setCustom] = useState(() => periodRange('last30', history.latest, today));
-  const [selected, setSelected] = useState(allCategories);
+  const [selected, setSelected] = useState(() => allCategories(history.categories));
   const [averageDays, setAverageDays] = useState(30);
   const range = useMemo(() => selectedRange(history, today, period, custom), [history, today, period, custom]);
   const points = useMemo(() => trend(history, range, selected, averageDays), [history, range, selected, averageDays]);
@@ -31,7 +31,7 @@ function WasteDashboard({ snapshot, isDemo }) {
   function reset() {
     setPeriod('last30');
     setCustom(periodRange('last30', history.latest, today));
-    setSelected(allCategories());
+    setSelected(allCategories(history.categories));
     setAverageDays(30);
   }
 
@@ -60,7 +60,7 @@ function WasteDashboard({ snapshot, isDemo }) {
       <section className="waste-panel waste-trend" aria-labelledby="waste-trend-title">
         <h2 id="waste-trend-title">{waste.trend}</h2>
         <div className="waste-filters">
-          <CategoryFilter selected={selected} onChange={setSelected} />
+          <CategoryFilter available={history.categories} selected={selected} onChange={setSelected} />
           <PeriodFilter history={history} today={today} period={period} onPeriod={setPeriod} custom={custom} onCustom={setCustom} />
           <WasteSelect label={waste.movingAverage} value={averageDays} onSelect={setAverageDays} caption
             options={[7, 14, 30, 60, 90].map((id) => ({ id, name: waste.averageDays(id) }))} />
@@ -101,7 +101,7 @@ function SharedWaste({ isDemo }) {
     const controller = new AbortController();
     async function load() {
       try {
-        const dashboard = isDemo ? 'get_waste_demo_dashboard' : 'get_waste_dashboard';
+        const dashboard = isDemo ? 'get_demo_waste_report' : 'get_waste_dashboard';
         const { data, error } = await supabase.rpc(dashboard).abortSignal(controller.signal);
         if (error || !data) throw error;
         if (!controller.signal.aborted) setState({ snapshot: data });

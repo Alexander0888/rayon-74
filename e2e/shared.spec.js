@@ -3,6 +3,7 @@ import { parseEnv } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { test, expect } from '@playwright/test';
+import { todayInZurich } from '../src/app/calendar.js';
 import { createSharedPlanStore } from '../src/features/herbs/data/sharedPlanStore.js';
 import { emptySlots } from '../src/features/herbs/data/plans.js';
 import { chooseHerb, confirm, filled, noOverflow, openEditor, selectTemplate } from './helpers.js';
@@ -58,7 +59,7 @@ test('orders show the Zurich delivery date, categories, statuses and responsive 
     } });
   });
   await page.goto('/#/orders');
-  await expect(page.getByText('Connectez-vous avec un compte gestionnaire pour consulter les commandes.')).toBeVisible();
+  await expect(page.getByLabel('Date de livraison', { exact: true })).toBeVisible();
   expect(dates).toHaveLength(0);
   await login(page);
   await page.clock.setFixedTime(new Date('2026-11-22T12:00:00Z'));
@@ -150,9 +151,14 @@ test('shared login persists through routes; publication updates a separate publi
   let model = await store.saveTemplate({ id: randomUUID(), name: `UI ${randomUUID()}`, slots: emptySlots(), example: false });
   const visitor = await browser.newContext();
   const publicPage = await visitor.newPage();
+  let planReads = 0;
+  publicPage.on('response', (response) => {
+    if (new URL(response.url()).pathname === '/rest/v1/published_plan' && response.ok()) planReads += 1;
+  });
   try {
     await publicPage.goto('http://127.0.0.1:5181/#/herbs');
     await expect(publicPage.locator('.stand-heading h2')).toHaveText(before.published.name);
+    await expect.poll(() => planReads).toBeGreaterThanOrEqual(2);
     const beforeLabels = await publicPage.locator('.slot').evaluateAll((slots) => slots.map((slot) => slot.getAttribute('aria-label')));
     await expect(publicPage.getByRole('button', { name: 'Éditeur', exact: true })).toHaveCount(0);
     await page.goto('/');
@@ -221,10 +227,11 @@ test('waste dashboard ranks subgroups, reveals articles and keeps report control
     ...historical.map(([id]) => ['2026-10-02', id, 100, 200]),
   ];
   let requests = 0;
-  await page.route('**/rest/v1/rpc/get_waste_demo_dashboard', (route) => route.fulfill({ json: {
-    coverage: [['2026-10-01', '2026-11-22']],
+  await page.route('**/rest/v1/rpc/get_demo_waste_report', (route) => route.fulfill({ json: {
+    coverage: [['2026-10-01', '2026-11-21']],
+    days: ['2026-11-21'],
     products: [[1, 'Poire de démonstration', 'Fruits', 'Poires', 'Poires KG', '4709']],
-    entries: [['2026-11-22', 1, 2700, 5400]],
+    entries: [[0, 1, 2700, 5400]],
   } }));
   await page.route('**/rest/v1/rpc/get_waste_dashboard', (route) => {
     requests += 1;
@@ -245,7 +252,8 @@ test('waste dashboard ranks subgroups, reveals articles and keeps report control
   await expect(page.getByText('Données simulées jusqu’au')).toBeVisible();
   await expect(page.getByText('Dernier import', { exact: true })).toHaveCount(0);
   await expect(page.locator('.waste-total').first()).toHaveText(/^27\sCHF$/);
-  await expect(page.getByRole('columnheader', { name: '22 nov.', exact: true })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: '21 nov.', exact: true })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: '22 nov.', exact: true })).toHaveCount(0);
   await noOverflow(page);
   expect(requests).toBe(0);
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -521,10 +529,12 @@ test('a failed save during navigation keeps the draft and allows retry', async (
 });
 
 test('the virtual visit serves simulations to guests and queries product data after manager login', async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   const requests = [];
   page.on('request', (request) => {
-    if (request.url().endsWith('/rpc/get_cart_product_hud')) requests.push(request.postDataJSON().p_product);
+    const source = request.url().match(/\/rpc\/(get_demo_product_hud|get_cart_product_hud)$/)?.[1];
+    if (source) requests.push([source, request.postDataJSON().p_product]);
   });
 
   await page.goto('/#/visit');
@@ -537,18 +547,104 @@ test('the virtual visit serves simulations to guests and queries product data af
   await expect(toggle).toBeEnabled({ timeout: 30_000 });
   await toggle.click();
   await avocado.click();
-  await expect(page.getByText('Données de démonstration', { exact: true })).toBeVisible();
-  expect(requests).toEqual([]);
+  await expect(page.locator('.hud-card').getByText('Mode démo', { exact: true })).toBeVisible();
+  expect(requests).toEqual([['get_demo_product_hud', 'avocado']]);
 
   await login(page);
-  await page.reload();
-  await expect(page.getByRole('button', { name: 'Se déconnecter', exact: true })).toBeVisible();
   await expect(draft).toBeHidden();
   await expect(page.getByText('Mode démo', { exact: true })).toBeHidden();
-  await expect(toggle).toBeEnabled({ timeout: 30_000 });
-  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Se placer près de la charrette' }).click();
   await avocado.click();
   await expect(page.getByRole('heading', { name: 'Avocat Hass' })).toBeVisible();
   await expect(page.getByRole('button', { name: '7 jours' })).toBeVisible();
-  expect(requests).toEqual(['avocado']);
+  expect(requests).toEqual([['get_demo_product_hud', 'avocado'], ['get_cart_product_hud', 'avocado']]);
+});
+
+test('guests browse several demo months and open a HUD for another catalog item', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const guest = createClient(settings.VITE_SUPABASE_URL, settings.VITE_SUPABASE_PUBLISHABLE_KEY,
+    { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data: report, error } = await guest.rpc('get_demo_waste_report');
+  expect(error).toBeNull();
+  test.skip(!report.products.length, 'Requires the local order and waste imports.');
+  const extra = report.products.find(([, name]) => /^Basilic\b/i.test(name));
+  const [id, title] = extra;
+  const { data: product } = await guest.rpc('get_demo_product_hud', { p_product: String(id) });
+  expect(product.wasteName).toBe(title);
+
+  await page.goto('/#/orders');
+  await expect(page.getByText('Mode démo', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Choisir une période' }).click();
+  await page.getByLabel('Du', { exact: true }).fill(report.days[0]);
+  await page.getByLabel('Au', { exact: true }).fill(todayInZurich());
+  const fruitGroup = page.getByRole('region', { name: 'Fruits', exact: true });
+  await expect(fruitGroup.getByRole('rowheader')).toHaveCount(48);
+  const firstReference = await fruitGroup.locator('.orders-reference').first().textContent();
+  await fruitGroup.getByRole('button', { name: 'Suivant', exact: true }).click();
+  await expect(fruitGroup.getByText(/^49–96 sur /)).toBeVisible();
+  await expect(fruitGroup.locator('.orders-reference').first()).not.toHaveText(firstReference);
+  const totals = page.getByRole('table', { name: 'Totaux par catégorie' });
+  const totalsText = await totals.textContent();
+  await page.getByRole('searchbox', { name: 'Rechercher', exact: true }).fill(product.manorVariant);
+  await expect(page.getByRole('rowheader').filter({ hasText: product.name }).first()).toBeVisible();
+  await expect(totals).toHaveText(totalsText);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await noOverflow(page);
+
+  await page.goto('/#/waste');
+  await expect(page.getByRole('group', { name: /Graphique des pertes par jour/ })).toBeVisible();
+  const heat = page.locator('.waste-heat');
+  await heat.getByRole('combobox', { name: 'Période' }).click();
+  await page.getByRole('option', { name: 'Mois précédent' }).click();
+  await expect(heat.locator('tbody tr').first()).toBeVisible();
+  const months = await heat.locator('th[scope=col] time').evaluateAll((nodes) =>
+    nodes.map((node) => new Date(node.dateTime + 'T00:00:00Z').getUTCDay()));
+  expect(months).not.toContain(0);
+  await noOverflow(page);
+
+  // Bind an existing basket to a fourth catalog product in this browser alone.
+  let linked = false;
+  await page.route(/\/visit\/cart\.js(\?|$)/, async (route) => {
+    const response = await route.fetch();
+    const original = await response.text();
+    const body = original.replace(/\{\s*id:\s*['"]avocado['"],/, "{ id: 'avocado', product: " + id + ",");
+    linked = body !== original;
+    await route.fulfill({ response, body });
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/#/visit');
+  await page.getByRole('button', { name: 'Compris' }).click();
+  const toggle = page.getByRole('button', { name: 'Mode HUD', exact: true });
+  await expect(toggle).toBeEnabled({ timeout: 45_000 });
+  expect(linked).toBe(true);
+  await toggle.click();
+  const basket = page.locator('button[data-hud-product="' + id + '"]');
+  await expect(basket).toHaveCount(1);
+  const [response] = await Promise.all([
+    page.waitForResponse((item) => item.url().endsWith('/rpc/get_demo_product_hud') && item.request().method() === 'POST',
+      { timeout: 25_000 }),
+    basket.evaluate((button) => button.click()),
+  ]);
+  expect(response.ok()).toBe(true);
+  expect(response.request().postDataJSON().p_product).toBe(String(id));
+  await expect(page.locator('.hud-card').getByRole('heading', { name: product.name, exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.hud-card').locator('[data-source=waste] tbody tr')).toHaveCount(6);
+});
+
+test('an employee keeps restricted access to the working orders and waste', async ({ page }) => {
+  const employee = JSON.parse(readFileSync('supabase/demo-accounts.local', 'utf8')).find(({ role }) => role === 'employee');
+  await page.goto('/#/orders');
+  await page.getByRole('button', { name: 'Se connecter', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Adresse e-mail', { exact: true }).fill(employee.email);
+  await dialog.getByLabel('Mot de passe', { exact: true }).fill(employee.password);
+  await dialog.getByRole('button', { name: 'Se connecter', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Un compte gestionnaire est nécessaire');
+  await dialog.getByRole('button', { name: 'Annuler', exact: true }).click();
+  await expect(page.getByText('Connectez-vous avec un compte gestionnaire pour consulter les commandes.')).toBeVisible();
+  await page.goto('/#/waste');
+  await expect(page.getByText('Connectez-vous avec un compte gestionnaire pour consulter les pertes.')).toBeVisible();
+  await expect(page.getByText('Mode démo', { exact: true })).toHaveCount(0);
 });

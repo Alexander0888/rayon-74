@@ -527,7 +527,6 @@ export async function openChristmasViewer(canvas, {
         if (hud && enabled) select(null);
         hud?.setEnabled(enabled);
       },
-      openHud: hud?.open,
       closeHud: hud?.close,
       restore:()=>commit(originalItems(),null),
       empty:()=>commit([],null),

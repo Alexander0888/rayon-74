@@ -109,14 +109,15 @@ export function WasteSummary({ history, today, options, isDemo }) {
   const [rankBy, setRankBy] = useState('subgroup');
   const [expanded, setExpanded] = useState(false);
   const disclosure = useExpandedRows();
-  const periodEnd = period === 'latest' ? history.latestRecorded : history.latest;
+  const periodEnd = period === 'latest' && !isDemo ? history.latestRecorded : history.latest;
   const range = useMemo(() => period === 'date'
     ? (chosenDay && chosenDay >= history.first && chosenDay <= today ? [chosenDay, chosenDay] : null)
     : periodRange(period, periodEnd, today), [period, history.first, periodEnd, today, chosenDay]);
   const { total, breakdown, top } = useMemo(() => summary(history, range, rankBy), [history, range, rankBy]);
   const covered = hasCoverage(history, range);
-  const coverageNote = range?.[1] > history.latest ? waste.partial(longDay(history.latest))
-    : graphDates(range, history.includeSundays).some((day) => !isCovered(history, day)) ? waste.partialCoverage : null;
+  const days = graphDates(range);
+  const coverageNote = days.at(-1) > history.latest ? waste.partial(longDay(history.latest))
+    : days.some((day) => !isCovered(history, day)) ? waste.partialCoverage : null;
   const title = periodLabel(period, today, isDemo);
 
   function changeDate(setter, value) {
@@ -165,7 +166,7 @@ export function WasteSummary({ history, today, options, isDemo }) {
             ) : <p className="waste-note">{waste.noLosses}</p>}
           </div>
         </>
-      ) : <p className="waste-note waste-summary-empty">{waste.missingPeriod}</p>}
+      ) : <p className="waste-note waste-summary-empty">{range && !days.length ? waste.closedDay : waste.missingPeriod}</p>}
     </article>
   );
 }

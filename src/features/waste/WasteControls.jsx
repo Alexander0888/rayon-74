@@ -6,7 +6,6 @@ import { categories, periodRange, shiftDay, validCustomRange } from './wasteData
 import { periodLabel } from './wasteFormat.js';
 
 const periods = ['last7', 'week', 'last30', 'month', 'previous', 'custom'];
-const categoryOptions = categories.map(({ name }) => ({ id: name, name }));
 
 export function WasteSelect({ label, options, value, onSelect, caption = false, className = '' }) {
   return <div className={`waste-select ${className}`}>
@@ -91,7 +90,8 @@ export function FilterMenu({ label, caption, options, selected, onChange, allLab
   );
 }
 
-export function CategoryFilter({ selected, onChange, column = false }) {
+export function CategoryFilter({ available = categories, selected, onChange, column = false }) {
+  const categoryOptions = available.map(({ name }) => ({ id: name, name }));
   const [draft, setDraft] = useState(selected);
   const filtered = selected.size !== categoryOptions.length;
   const caption = filtered ? waste.selectedCategories(selected.size) : waste.allCategories;

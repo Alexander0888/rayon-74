@@ -18,6 +18,7 @@
     "db:demo": "node scripts/setup-local.js",
     "dev:shared": "vite --mode shared --port 5174 --strictPort",
     "test:shared": "node scripts/check-shared.js",
+    "test:demo": "node scripts/check-demo-quality.js",
     "build:pages": "node scripts/build-pages.js"
   },
   "dependencies": {

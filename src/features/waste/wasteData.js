@@ -11,7 +11,8 @@ export const categories = [
   { name: 'Fruits secs', color: '#c78377' },
 ];
 
-export const allCategories = () => new Set(categories.map(({ name }) => name));
+const unclassified = { name: 'À classer', color: '#79858b' };
+export const allCategories = (available = categories) => new Set(available.map(({ name }) => name));
 
 const frenchSort = new Intl.Collator('fr', { sensitivity: 'base', numeric: true });
 export const compareNames = (a, b) => frenchSort.compare(a, b);
@@ -63,41 +64,56 @@ export function validCustomRange([from, to], history, maxDays) {
 }
 
 const includesDay = (range, day) => Boolean(range?.[0] && range?.[1] && day >= range[0] && day <= range[1]);
-export function graphDates(range, includeSundays = false) {
+export function graphDates(range) {
   if (!range?.[0] || !range?.[1]) return [];
   const days = [];
   for (let day = range[0]; day <= range[1]; day = shiftDay(day, 1)) {
-    if (includeSundays || !isSunday(day)) days.push(day);
+    if (!isSunday(day)) days.push(day);
   }
   return days;
 }
 
-export function buildHistory({ importedAt, coverage, products, entries }, metric = 'pa', includeSundays = false) {
+export function buildHistory({ importedAt, coverage, days, products, entries }, metric = 'pa') {
   const catalog = new Map(products.map(([id, name, category, group, subgroup, reference]) => [
-    id, { id, name, category, group, subgroup, reference },
+    id, { id, name, category, group, subgroup, reference, subgroupKey: JSON.stringify(['subgroup', category, group, subgroup]) },
   ]));
+  const loadedDays = days && new Set(days.filter((day) => !isSunday(day)));
+  const ranges = coverage.map(([start, end]) => [
+    isSunday(start) ? shiftDay(start, 1) : start, isSunday(end) ? shiftDay(end, -1) : end,
+  ]).filter(([start, end]) => start <= end);
+  let latestRecorded = null;
+  const readings = [];
+  for (const [key, id, pa, ventes] of entries) {
+    const day = days ? days[key] : key;
+    const product = catalog.get(id);
+    if (!product || !day || (loadedDays ? !loadedDays.has(day) : isSunday(day))) continue;
+    if (!latestRecorded || day > latestRecorded) latestRecorded = day;
+    readings.push({ day, product, amount: metric === 'pa' ? pa : ventes });
+  }
   return {
     importedAt,
-    coverage,
-    includeSundays,
-    first: coverage.reduce((day, [start]) => (!day || start < day ? start : day), null),
-    latest: coverage.reduce((day, [, end]) => (!day || end > day ? end : day), null),
-    latestRecorded: entries.reduce((latest, [day]) => (!latest || day > latest ? day : latest), null),
-    entries: entries.map(([day, id, pa, ventes]) => ({
-      day, product: catalog.get(id), amount: metric === 'pa' ? pa : ventes,
-    })),
+    coverage: ranges,
+    loadedDays,
+    categories: products.some((product) => product[2] === unclassified.name) ? [...categories, unclassified] : categories,
+    first: ranges.reduce((day, [start]) => (!day || start < day ? start : day), null),
+    latest: ranges.reduce((day, [, end]) => (!day || end > day ? end : day), null),
+    latestRecorded,
+    entries: readings,
   };
 }
 
-export const isCovered = (history, day) => history.coverage.some((range) => includesDay(range, day));
-export const hasCoverage = (history, range) =>
-  Boolean(range?.[0] && range?.[1] && range[0] <= range[1] &&
-    history.coverage.some(([from, to]) => from <= range[1] && to >= range[0]));
+export const isCovered = (history, day) => history.loadedDays
+  ? history.loadedDays.has(day) : !isSunday(day) && history.coverage.some((range) => includesDay(range, day));
+
+export const hasCoverage = (history, range) => Boolean(range?.[0] && range?.[1] && range[0] <= range[1] &&
+  (history.loadedDays ? [...history.loadedDays].some((day) => includesDay(range, day)) :
+    history.coverage.some(([from, to]) => from <= range[1] && to >= range[0] &&
+      (range[0] !== range[1] || !isSunday(range[0])))));
 
 export function summary(history, range, grouping) {
   const rows = subgroupRows(history, range);
-  const amounts = new Map(categories.map(({ name }) => [name, 0]));
-  const [vegetables, fruits, ...remainingCategories] = categories;
+  const amounts = new Map(history.categories.map(({ name }) => [name, 0]));
+  const [vegetables, fruits, ...remainingCategories] = history.categories;
   for (const row of rows) amounts.set(row.category, (amounts.get(row.category) ?? 0) + row.amount);
   return {
     total: rows.reduce((sum, row) => sum + row.amount, 0),
@@ -112,9 +128,9 @@ export function trend(history, range, selected, movingDays) {
     if (selected.has(product.category)) amounts.set(day, (amounts.get(day) ?? 0) + amount);
   }
   const valueFor = (day) => isCovered(history, day) ? amounts.get(day) ?? 0 : null;
-  return graphDates(range, history.includeSundays).map((day) => {
+  return graphDates(range).map((day) => {
     const amount = valueFor(day);
-    const previous = graphDates([shiftDay(day, -movingDays), shiftDay(day, -1)], history.includeSundays).map(valueFor);
+    const previous = graphDates([shiftDay(day, -movingDays), shiftDay(day, -1)]).map(valueFor);
     const average = amount === null || previous.some((value) => value === null) ? null
       : previous.reduce((total, value) => total + value, 0) / previous.length;
     return { day, amount, average };
@@ -136,8 +152,7 @@ export function subgroupRows(history, range, days = null) {
   const rows = new Map();
   for (const { day, product, amount } of history.entries) {
     if (days ? !days.has(day) : !includesDay(range, day)) continue;
-    const { id, name, category, group, subgroup, reference } = product;
-    const key = JSON.stringify(['subgroup', category, group, subgroup]);
+    const { id, name, category, group, subgroup, reference, subgroupKey: key } = product;
     if (!rows.has(key)) rows.set(key, { key, label: subgroup, category, group, amount: 0, values: new Map(), variants: new Map() });
     const row = rows.get(key);
     if (!row.variants.has(id)) row.variants.set(id, {
@@ -148,7 +163,7 @@ export function subgroupRows(history, range, days = null) {
   }
   return [...rows.values()].map(({ variants, ...row }) => {
     const products = [...variants.values()].sort(highestLoss);
-    return { ...row, products, children: products.length > 1 ? products : [] };
+    return { ...row, products, children: products.length > 1 || history.loadedDays ? products : [] };
   });
 }
 
@@ -181,7 +196,7 @@ export function tableRows(subgroups, groups, query, order) {
 }
 
 export function heatRows(history, range, grouping, query) {
-  const days = graphDates(range, history.includeSundays);
+  const days = graphDates(range);
   const rows = rollupRows(subgroupRows(history, range, new Set(days)), grouping);
   const keyword = searchKey(query.trim());
   return {

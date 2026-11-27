@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { productHud as copy } from '../../../content/fr.js';
 import { facePixels, makeHudBody, makeHudProjection, slab } from './hudVisuals.js';
 
 const { clamp, smoothstep } = THREE.MathUtils;
@@ -23,13 +24,27 @@ export function createHudScene({ scene, camera, cart, layer, orbit, onChange, re
   const projection = makeHudProjection();
   scene.add(body.root, projection.root);
   cart.updateWorldMatrix(true, false);
-  const targets = cart.userData.hudTargets.map(({ id, top, hit, radii }) => {
+  const targets = cart.userData.hudTargets.map(({
+    id, product = id, label = copy.products[product], top, hit, radii,
+  }) => {
+    const beacon = document.createElement('button');
+    beacon.type = 'button';
+    beacon.className = 'hud-hotspot';
+    beacon.hidden = true;
+    beacon.dataset.hudProduct = product;
+    beacon.dataset.label = label ?? copy.product;
+    beacon.setAttribute('aria-label', copy.inspect(beacon.dataset.label));
+    const dot = document.createElement('span');
+    dot.setAttribute('aria-hidden', 'true');
+    beacon.append(dot);
     const transform = new THREE.Matrix4().makeScale(...radii).setPosition(...hit).premultiply(cart.matrixWorld);
-    return {
-      id, top: cart.localToWorld(new THREE.Vector3(...top)),
+    const target = {
+      id, product, label, beacon, top: cart.localToWorld(new THREE.Vector3(...top)),
       transform, inverse: transform.clone().invert(),
-      beacon: layer.querySelector(`[data-hud-product="${id}"]`),
     };
+    beacon.addEventListener('click', (event) => open(target, event.detail === 0));
+    layer.append(beacon);
+    return target;
   });
 
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -69,10 +84,9 @@ export function createHudScene({ scene, camera, cart, layer, orbit, onChange, re
     };
   }
 
-  function open(id, byKeyboard = false) {
-    if (!enabled || chosen?.id === id) return;
-    chosen = targets.find((item) => item.id === id);
-    if (!chosen) return;
+  function open(target, byKeyboard = false) {
+    if (!enabled || chosen === target) return;
+    chosen = target;
     start = performance.now();
     focusCard = byKeyboard;
     center.copy(chosen.top);
@@ -84,7 +98,7 @@ export function createHudScene({ scene, camera, cart, layer, orbit, onChange, re
     } else {
       aimOnFoot(aim);
     }
-    onChange({ id: chosen.id, mount: face });
+    onChange({ product: chosen.product, label: chosen.label, mount: face });
     redraw();
   }
 
@@ -98,7 +112,7 @@ export function createHudScene({ scene, camera, cart, layer, orbit, onChange, re
       best = distance;
       target = item;
     }
-    if (target) open(target.id);
+    if (target) open(target);
     else close();
     return Boolean(target);
   }
@@ -187,7 +201,7 @@ export function createHudScene({ scene, camera, cart, layer, orbit, onChange, re
   }
 
   return {
-    draw, close, open, selectFromRay,
+    draw, close, selectFromRay,
     get isOpen() { return Boolean(chosen); },
     cancelFocus() { focus = null; },
     resize(w, h) {
@@ -210,11 +224,11 @@ export function createHudScene({ scene, camera, cart, layer, orbit, onChange, re
     },
     dispose() {
       face.remove();
+      for (const { beacon } of targets) beacon.remove();
       body.root.removeFromParent();
       projection.root.removeFromParent();
       body.dispose();
       projection.dispose();
-      for (const { beacon } of targets) beacon.hidden = true;
     },
   };
 }

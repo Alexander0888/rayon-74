@@ -16,9 +16,9 @@ test('the product HUD shows sparse historical deliveries and compares dates with
       order(-6, 'ordered', 32), order(-4, 'ordered', 48), order(-1, 'ordered', 16),
       order(0, 'ordered', 32), order(1, 'ordered', 16), order(-20, 'ordered', 96),
     ],
-    waste: [waste(-4, 5), waste(-3, 2), waste(-20, 3)],
+    waste: [waste(-4, 5), waste(-2, 2), waste(-3, 200), waste(-20, 3)],
     orderDays: [day(-20), day(-6), day(-4), day(-1), today],
-    wasteDays: [day(-20), day(-4), day(-3)],
+    wasteDays: [day(-20), day(-4), day(-2), day(-3)],
   };
   const week = summarizeProduct(snapshot, 7);
   assert.deepEqual(week.orderRows.map(({ day, phase }) => [day, phase]), [
@@ -26,6 +26,8 @@ test('the product HUD shows sparse historical deliveries and compares dates with
   ]);
   assert.equal(week.percentage, 5 / 48);
   assert.equal(week.comparedDays, 1);
+  assert.equal(week.workingDays, 6);
+  assert.ok(!week.wasteRows.some(({ day: reading }) => reading === day(-3)));
   assert.equal(week.totalWaste[0].quantity, 7);
   assert.equal(week.totalOrders[0].quantity, 128);
   assert.deepEqual(week.wasteRows.at(-1).values, []);

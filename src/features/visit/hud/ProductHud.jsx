@@ -4,12 +4,12 @@ import { Box, CalendarDays, ChartNoAxesColumn, ScanLine, Trash2, X } from 'lucid
 import { shiftDay } from '../../../app/calendar.js';
 import { fr, productHud as copy } from '../../../content/fr.js';
 import { supabase } from '../../../services/supabase.js';
-import { demoProduct, summarizeProduct } from './productData.js';
+import { summarizeProduct } from './productData.js';
 import './productHud.css';
 
 const dateLabel = new Intl.DateTimeFormat('fr-CH', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 const fullDate = new Intl.DateTimeFormat('fr-CH', { dateStyle: 'full', timeZone: 'UTC' });
-const countLabel = new Intl.NumberFormat('fr-CH', { maximumFractionDigits: 2 });
+const countLabel = new Intl.NumberFormat('fr-CH', { maximumFractionDigits: 3 });
 const percentLabel = new Intl.NumberFormat('fr-CH', { style: 'percent', maximumFractionDigits: 1 });
 const dateOf = (day) => new Date(`${day}T00:00:00Z`);
 
@@ -52,7 +52,6 @@ export function useProductHud(viewer, canvas, ready) {
   return {
     layer, enabled, selection, setSelection, close,
     toggle: () => setEnabled((active) => !active),
-    open: (id, byKeyboard) => viewer.current?.openHud?.(id, byKeyboard),
   };
 }
 
@@ -97,35 +96,37 @@ function History({ kind, title, detail, icon: Icon, rows }) {
   );
 }
 
-function ProductHudCard({ id, onClose, account }) {
+function ProductHudCard({ product, label, onClose, account }) {
   const [period, setPeriod] = useState(7);
   const [response, setResponse] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const demo = account?.isDemo;
   const accessPending = account?.accessPending;
-  const canRead = !demo && Boolean(account?.canEdit && supabase);
+  const canRead = Boolean(supabase && (demo || account?.canEdit));
+  const offline = demo && !supabase ? __RAYON_HUD_PREVIEW__?.[product] : null;
   const accountId = account?.workspaceKey;
-  const snapshot = demo ? demoProduct(id) : canRead && response?.accountId === accountId ? response?.data : null;
-  const failed = !demo && canRead && response?.accountId === accountId && response?.error;
+  const current = canRead && response && response.accountId === accountId && response.demo === demo ? response : null;
+  const snapshot = offline ?? current?.data;
+  const failed = (demo && !supabase && !offline) || current?.error;
   const data = snapshot && summarizeProduct(snapshot, period);
-  const coverage = data?.comparedDays;
-  const name = copy.products[id];
+  const name = label ?? snapshot?.name ?? copy.product;
 
   useEffect(() => {
     if (!canRead) return;
     const controller = new AbortController();
+    const rpc = demo ? 'get_demo_product_hud' : 'get_cart_product_hud';
     async function load() {
       try {
-        const { data, error } = await supabase.rpc('get_cart_product_hud', { p_product: id }).abortSignal(controller.signal);
+        const { data, error } = await supabase.rpc(rpc, { p_product: String(product) }).abortSignal(controller.signal);
         if (error || !data) throw new Error();
-        if (!controller.signal.aborted) setResponse({ accountId, data });
+        if (!controller.signal.aborted) setResponse({ accountId, demo, data });
       } catch {
-        if (!controller.signal.aborted) setResponse({ accountId, error: true });
+        if (!controller.signal.aborted) setResponse({ accountId, demo, error: true });
       }
     }
     void load();
     return () => controller.abort();
-  }, [accountId, attempt, canRead, id]);
+  }, [accountId, attempt, canRead, demo, product]);
 
   return (
     <article className="hud-card" aria-label={name} tabIndex={-1}>
@@ -165,13 +166,15 @@ function ProductHudCard({ id, onClose, account }) {
               {data.percentage !== null && <div className="hud-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, data.percentage * 100)}%` }} /></div>}
             </div>
           </div>
-          <p className="hud-note">{data.percentage === null ? copy.noRate : coverage < period ? copy.partial(coverage, period) : copy.unitsNote}</p>
+          <p className="hud-note">{data.percentage === null ? copy.noRate : data.comparedDays < data.workingDays
+            ? copy.partial(data.comparedDays, data.workingDays) : copy.unitsNote}</p>
+          {offline && <p className="hud-note">{copy.snapshot(fullDate.format(dateOf(data.today)))}</p>}
         </>
       ) : (
         <div className="hud-message" role="status">
           <p>{failed ? copy.unavailable : accessPending || canRead ? copy.loading : copy.restricted}</p>
           {!accessPending && !canRead && account?.signIn && <button type="button" onClick={account.signIn}>{fr.signIn}</button>}
-          {failed && (
+          {failed && canRead && (
             <button type="button" onClick={() => { setResponse(null); setAttempt((tries) => tries + 1); }}>
               {fr.retry}
             </button>
@@ -185,14 +188,9 @@ function ProductHudCard({ id, onClose, account }) {
 export function ProductHudLayer({ hud, account }) {
   return (
     <div className="product-hud-layer" ref={hud.layer}>
-      {Object.entries(copy.products).map(([id, name]) => (
-        <button type="button" className="hud-hotspot" key={id} hidden aria-label={copy.inspect(name)}
-          data-hud-product={id} data-label={name} onClick={(event) => hud.open(id, event.detail === 0)}>
-          <span aria-hidden="true" />
-        </button>
-      ))}
       {hud.selection && createPortal(
-        <ProductHudCard key={hud.selection.id} id={hud.selection.id} account={account} onClose={() => hud.close(true)} />,
+        <ProductHudCard key={hud.selection.product} product={hud.selection.product} label={hud.selection.label}
+          account={account} onClose={() => hud.close(true)} />,
         hud.selection.mount,
       )}
     </div>
