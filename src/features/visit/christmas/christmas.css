@@ -68,6 +68,30 @@
 }
 
 .noel-heading-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.noel-heading-actions input[hidden] { display: none; }
+.noel-history-buttons {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--noel-line);
+  border-radius: 8px;
+  background: var(--noel-paper);
+}
+.noel-history-buttons button {
+  display: grid;
+  place-items: center;
+  width: 39px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--noel-green);
+  cursor: pointer;
+}
+.noel-history-buttons button:hover:not(:disabled) { background: #eae8de; }
+.noel-history-buttons button:disabled,
+.noel-page .noel-object-buttons button:disabled { opacity: .45; cursor: default; }
 
 .noel-page :is(button, summary) { -webkit-tap-highlight-color: transparent; }
 
@@ -93,9 +117,13 @@
 }
 
 .noel-add:hover:not(:disabled) { background: #304c3e; }
-.noel-add:disabled { opacity: .48; cursor: wait; }
+.noel-add:disabled { opacity: .48; cursor: default; }
 .noel-add-arrow { margin-left: 3px; opacity: .78; }
-
+.noel-heading-actions .noel-layout-toggle[aria-pressed="true"] {
+  color: #f8f8ef;
+  border-color: var(--noel-green);
+  background: var(--noel-green);
+}
 .noel-scene-actions { position: relative; }
 .noel-scene-actions summary {
   height: 44px;
@@ -196,21 +224,48 @@
 .noel-views,
 .noel-landmarks,
 .noel-camera-actions,
-.noel-directions {
+.noel-directions,
+.noel-object-name,
+.noel-object-buttons {
   display: flex;
   gap: 3px;
-  position: absolute;
-  z-index: 2;
   padding: 4px;
   border-radius: 10px;
   background: #f8f6edf2;
   border: 1px solid #ffffff82;
   box-shadow: 0 2px 12px #28241d13, 0 1px 1px #28241d14;
 }
+.noel-views,
+.noel-landmarks {
+  position: absolute;
+  z-index: 2;
+}
 .noel-views { top: 14px; left: 14px; }
 .noel-landmarks { top: 74px; left: 14px; }
-.noel-camera-actions { right: 14px; bottom: 14px; }
-.noel-directions { bottom: 14px; left: 14px; touch-action: none; }
+.noel-stage-bottom {
+  position: absolute;
+  z-index: 2;
+  inset-inline: var(--noel-ui-left, var(--noel-stage-gutter, 14px)) var(--noel-ui-right, var(--noel-stage-gutter, 14px));
+  bottom: var(--noel-ui-bottom, var(--noel-stage-gutter, 14px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-block: 5px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  pointer-events: none;
+}
+.noel-stage-bottom > * { flex: none; }
+.noel-stage-context,
+.noel-object-toolbar { display: flex; align-items: center; gap: 8px; }
+.noel-stage-context { margin-inline: auto; }
+.noel-stage-bottom :is(.noel-camera-actions, .noel-directions, .noel-object-name, .noel-object-buttons, .noel-placement-note) {
+  pointer-events: auto;
+}
+.noel-camera-actions { margin-inline-start: auto; }
+.noel-stage-context + .noel-camera-actions { margin-inline-start: 0; }
+.noel-directions { touch-action: none; }
 .noel-page :is(.noel-views,.noel-landmarks,.noel-camera-actions,.noel-directions,.noel-object-buttons,.noel-catalog-head) button {
   display: inline-flex;
   align-items: center;
@@ -225,7 +280,7 @@
   color: var(--noel-green);
   cursor: pointer;
 }
-.noel-page :is(.noel-views,.noel-landmarks,.noel-camera-actions,.noel-directions,.noel-object-buttons,.noel-catalog-head) button:hover {
+.noel-page :is(.noel-views,.noel-landmarks,.noel-camera-actions,.noel-directions,.noel-object-buttons,.noel-catalog-head) button:hover:not(:disabled) {
   background: #eae8de;
 }
 .noel-page :is(.noel-views,.noel-object-buttons) button[aria-pressed='true'] {
@@ -237,23 +292,15 @@
 .noel-directions :active { background: #dfdfd3; }
 
 .noel-placement-note {
-  position: absolute;
-  z-index: 1;
-  bottom: 19px;
-  left: 50%;
-  transform: translateX(-50%);
+  width: max-content;
+  max-width: 31ch;
+  padding: 8px 12px;
+  border-radius: 8px;
   background: #253d32f4;
   color: #fffbef;
-  border-radius: 7px;
-  padding: 9px 12px;
-  text-align: center;
-  min-width: 230px;
-  width: max-content;
-  max-width: calc(100% - 134px);
-  pointer-events: none;
-  font-size: .83rem;
+  font-size: .8rem;
+  line-height: 1.25;
 }
-.noel-stage:has(.noel-directions) .noel-placement-note { bottom: 74px; }
 
 .noel-caption {
   display: flex;
@@ -269,24 +316,23 @@
 .noel-pick-help { margin-inline-start: .35em; }
 .noel-touch-help { display: none; }
 
-.noel-object-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 9px 24px;
-  padding: 8px 10px 8px 13px;
-  margin-top: 8px;
-  border: 1px solid var(--noel-line);
-  border-radius: 10px;
-  background: var(--noel-paper);
+.noel-object-name {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: center;
+  column-gap: 8px;
+  max-width: 18rem;
+  min-height: 50px;
+  padding: 5px 11px;
+  white-space: nowrap;
 }
-.noel-object-name { display: grid; align-items: center; column-gap: 10px; }
-.noel-object-name > span { font-size: .73rem; color: #5c6a58; grid-column: 1 / -1; }
-.noel-object-name strong { color: var(--noel-dark); font-size: .88rem; min-width: 0; }
-.noel-object-name output { color: #576753; font-size: .75rem; white-space: nowrap; }
-.noel-object-buttons { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.noel-object-name :is(span, strong) { overflow: hidden; text-overflow: ellipsis; }
+.noel-object-name > span { font-size: .73rem; color: #5c6a58; grid-row: 1; }
+.noel-object-name strong { color: var(--noel-dark); font-size: .88rem; grid-column: 1 / -1; grid-row: 2; }
+.noel-object-name output { color: #576753; font-size: .75rem; grid-column: 2; grid-row: 1; }
+.noel-object-buttons { align-items: center; white-space: nowrap; }
 .noel-page .noel-object-buttons button { border-color: #dfddd2; min-width: 38px; }
-.noel-page .noel-object-buttons .noel-move { padding: 0 10px; font-size: .79rem; font-weight: 700; }
+.noel-page .noel-object-buttons :is(.noel-move, .noel-duplicate) { padding: 0 10px; font-size: .79rem; font-weight: 700; }
 .noel-page .noel-object-buttons .noel-remove { color: #963728; }
 
 .noel-catalog {
@@ -435,18 +481,9 @@ body:has(.noel-page[data-fullscreen='viewport']) :is(.site-header, .site-footer,
 .noel-page[data-fullscreen] .noel-canvas { position: absolute; inset: 0; }
 .noel-page[data-fullscreen] .noel-views { top: var(--noel-ui-top); left: var(--noel-ui-left); }
 .noel-page[data-fullscreen] .noel-landmarks { top: calc(var(--noel-ui-top) + 60px); left: var(--noel-ui-left); }
-.noel-page[data-fullscreen] .noel-directions { bottom: var(--noel-ui-bottom); left: var(--noel-ui-left); }
-.noel-page[data-fullscreen] .noel-camera-actions { bottom: var(--noel-ui-bottom); right: var(--noel-ui-right); }
-.noel-page[data-fullscreen] .noel-placement-note { bottom: calc(var(--noel-ui-bottom) + 54px); }
-.noel-page[data-fullscreen] .noel-object-toolbar {
-  flex: none;
-  margin: 0;
-  padding-inline: var(--noel-ui-left) var(--noel-ui-right);
-  padding-bottom: var(--noel-ui-bottom);
-  border-radius: 0;
-}
 
 @media (pointer: coarse) {
+  .noel-history-buttons button { width: 44px; height: 44px; }
   .noel-desktop-help { display: none; }
   .noel-touch-help { display: inline; }
   .noel-page :is(.noel-views,.noel-landmarks,.noel-camera-actions,.noel-directions,.noel-object-buttons) button {
@@ -465,24 +502,24 @@ body:has(.noel-page[data-fullscreen='viewport']) :is(.site-header, .site-footer,
   .noel-page { width: calc(100% - 22px); margin: 14px auto 25px; }
   .noel-heading { margin: 8px 1px 12px; gap: 9px 11px; align-items: center; }
   .noel-heading h1 { font-size: clamp(1.9rem,8vw,2.25rem); }
-  .noel-heading-actions { gap: 5px; }
-  .noel-add { padding-inline: 9px; }
+  .noel-heading-actions { gap: 5px; position: relative; }
+  .noel-heading-actions .hud-toggle { padding-inline: 8px; min-height: 44px; font-size: .80rem; }
+  .noel-add { padding-inline: 9px; min-width: 44px; }
+  .noel-add span { display: none; }
   .noel-add-arrow { display: none; }
-  .noel-stage { height: clamp(325px,46svh,400px); border-radius: 9px; }
+  .noel-stage { --noel-stage-gutter: 8px; height: clamp(325px,46svh,400px); border-radius: 9px; }
   .noel-views { top: 8px; left: 8px; }
-  .noel-landmarks { top: 67px; left: 8px; }
-  .noel-camera-actions { right: 8px; bottom: 8px; }
-  .noel-directions { left: 8px; bottom: 8px; }
-  .noel-views button { font-size: .73rem; gap: 4px; padding-inline: 5px; }
-  .noel-views button svg { width: 14px; }
-  .noel-placement-note { bottom: 62px; max-width: calc(100% - 30px); }
-  .noel-stage:has(.noel-directions) .noel-placement-note { bottom: 65px; }
+  .noel-landmarks { top: 67px; left: 8px; max-width: calc(100% - 16px); overflow-x: auto; scrollbar-width: thin; }
+  .noel-landmarks button { flex-shrink: 0; }
+  .noel-page :is(.noel-views, .noel-landmarks) button { font-size: .73rem; gap: 4px; padding-inline: 5px; }
+  :is(.noel-views, .noel-landmarks) button svg { width: 14px; }
   .noel-caption { margin: 8px 3px 0; }
   .noel-source { flex: 0 1 auto; }
   .noel-pick-help { display: block; margin: 3px 0 0; }
-  .noel-object-toolbar { align-items: start; flex-direction: column; gap: 8px; padding: 8px; }
-  .noel-object-name { margin-left: 3px; }
-  .noel-scene-actions > div { right: auto; left: 0; }
+  .noel-stage-context { order: -1; margin-inline: 0; }
+  .noel-object-name { max-width: min(36vw, 9rem); }
+  .noel-scene-actions { position: static; }
+  .noel-scene-actions > div { width: min(282px, calc(100vw - 34px)); right: 0; }
   .noel-catalog-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .noel-catalog-grid button { font-size: .75rem; grid-template-columns: 29px minmax(0,1fr) 12px; gap: 5px; padding-inline: 5px; }
   .noel-catalog-grid button > svg { width: 12px; }
@@ -498,6 +535,15 @@ body:has(.noel-page[data-fullscreen='viewport']) :is(.site-header, .site-footer,
   .noel-stage { height: max(300px, calc(100svh - 88px)); }
 }
 
+@media (max-width: 460px) {
+  .noel-landmarks { gap: 2px; padding-inline: 3px; }
+  .noel-page .noel-landmarks button { padding-inline: 3px; }
+  .noel-landmarks button svg { display: none; }
+  .noel-page[data-fullscreen]:has(.noel-history-buttons) .noel-views { top: calc(var(--noel-ui-top) + 101px); }
+  .noel-page[data-fullscreen]:has(.noel-history-buttons) .noel-landmarks { top: calc(var(--noel-ui-top) + 160px); }
+}
+
 @media (max-width: 360px) {
-  .noel-stage:has(.noel-directions) .noel-camera-actions { flex-direction: column; }
+  .noel-stage-bottom { gap: 6px; }
+  .noel-stage-bottom > :is(.noel-directions, .noel-camera-actions) { gap: 0; padding: 1px; }
 }

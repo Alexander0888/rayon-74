@@ -52,12 +52,13 @@ export function useProductHud(viewer, canvas, ready) {
   return {
     layer, enabled, selection, setSelection, close,
     toggle: () => setEnabled((active) => !active),
+    disable: () => setEnabled(false),
   };
 }
 
-export function ProductHudToggle({ hud, ready }) {
+export function ProductHudToggle({ hud, ready, onToggle = hud.toggle }) {
   return (
-    <button type="button" className="hud-toggle" data-hud-toggle aria-pressed={hud.enabled} disabled={!ready} onClick={hud.toggle}>
+    <button type="button" className="hud-toggle" data-hud-toggle aria-pressed={hud.enabled} disabled={!ready} onClick={onToggle}>
       <ScanLine size={17} aria-hidden="true" />{copy.mode}
     </button>
   );

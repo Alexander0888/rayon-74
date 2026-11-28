@@ -606,10 +606,12 @@ test('guests browse several demo months and open a HUD for another catalog item'
 
   // Bind an existing basket to a fourth catalog product in this browser alone.
   let linked = false;
-  await page.route(/\/visit\/cart\.js(\?|$)/, async (route) => {
+  await page.route(/\/visit\/pear\/baskets\.js(\?|$)/, async (route) => {
     const response = await route.fetch();
     const original = await response.text();
-    const body = original.replace(/\{\s*id:\s*['"]avocado['"],/, "{ id: 'avocado', product: " + id + ",");
+    const body = original.replace('node.userData.hudTargets = hudTargets;',
+      `node.userData.hudTargets = hudTargets.map((target) => target.id === 'avocado'
+        ? { ...target, product: ${JSON.stringify(id)} } : target);`);
     linked = body !== original;
     await route.fulfill({ response, body });
   });

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, Construction, Crosshair, Footprints, Grid2X2,
-  Maximize, Minimize, Minus, MoreHorizontal, Move, MoveDown, MoveUp, Orbit, Plus, RotateCcw, RotateCw, Search, ShoppingBasket, Trash2, TreePine, X,
+  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CakeSlice, Carrot, ChevronDown, Construction, Copy, Crosshair, Download, Footprints, Grid2X2,
+  Leaf, Maximize, Minimize, Minus, MoreHorizontal, Move, MoveDown, MoveUp, Orbit, Plus, Redo2, RotateCcw, RotateCw, Search, ShoppingBasket, Sprout, Trash2, TreePine, Undo2, Upload, X,
 } from 'lucide-react';
 import { PlanDialog } from '../../../components/PlanDialog.jsx';
 import { christmas as copy, departmentVisit, fr, pageTitle, productHud, visit } from '../../../content/fr.js';
+import { herbById } from '../../herbs/data/herbs.js';
 import { ProductHudLayer, ProductHudToggle, useProductHud } from '../hud/ProductHud.jsx';
 import { types } from './layout.js';
 import './christmas.css';
@@ -25,6 +26,10 @@ const views = [
 const spots = [
   ['cart', ShoppingBasket, departmentVisit.cart, departmentVisit.cartView],
   ['noel', TreePine, departmentVisit.noel, departmentVisit.noelView],
+  ['carrots', Carrot, departmentVisit.carrots, departmentVisit.carrotsView],
+  ['salads', Leaf, departmentVisit.salads, departmentVisit.saladsView],
+  ['groceries', Sprout, departmentVisit.groceries, departmentVisit.groceriesView],
+  ['bakery', CakeSlice, departmentVisit.bakery, departmentVisit.bakeryView],
 ];
 const directions = [
   ['forward', ArrowUp, visit.forward], ['left', ArrowLeft, visit.left],
@@ -87,27 +92,50 @@ function Catalog({ onChoose, onClose }) {
   );
 }
 
-function ObjectToolbar({ selection, viewer }) {
+function ObjectToolbar({ selection, viewer, onDuplicate }) {
+  const { kind, type, id, source, step = 15, moving, isCopy } = selection;
+  const crate = kind === 'crate' || kind?.endsWith('-crate');
+  const label = departmentVisit.productSelection[kind]?.label ?? (crate ? departmentVisit.crateSelection : copy.selection);
+  const crateName = departmentVisit.crateTypes[type] ?? departmentVisit.pearTypes[type] ?? departmentVisit.vegetableTypes[type];
+  const name = kind === 'fixture' ? (type === 'fence' ? departmentVisit.fenceName((source ?? id).slice(-2)) : departmentVisit.fixtureTypes[type]) :
+    crate ? crateName : departmentVisit.pastryTypes[type] ?? departmentVisit.oliveTypes[type] ?? herbById[type]?.name ?? copy.objects[type];
   return (
-    <div className="noel-object-toolbar" role="group" aria-label={copy.selection}>
-      <div className="noel-object-name">
-        <span>{copy.selection}</span>
-        <strong>{copy.objects[selection.type]}</strong>
-        <output aria-live="polite" data-elevation={selection.y}>{copy.itemElevation(Math.round(selection.y*100))}</output>
+    <div className="noel-object-toolbar" role="group" aria-label={label}>
+      <div className="noel-object-name" title={name}>
+        <span>{label}</span>
+        <strong>{name}</strong>
+        {!kind && <output aria-live="polite" data-elevation={selection.y}>{copy.itemElevation(Math.round(selection.y*100))}</output>}
       </div>
       <div className="noel-object-buttons">
-        <button type="button" className="noel-move" aria-pressed={selection.moving} onClick={()=>viewer.current?.aimForPlacement()}>
-          <Move size={17} aria-hidden="true" />{selection.moving ? copy.cancelMove : copy.move}
+        <button type="button" className="noel-move" aria-pressed={moving}
+          onClick={() => moving ? viewer.current?.cancelMove() : viewer.current?.aimForPlacement()}>
+          {moving ? <X size={17} aria-hidden="true" /> : <Move size={17} aria-hidden="true" />}
+          {moving ? copy.cancelMove : copy.move}
         </button>
-        <IconAction icon={ArrowLeft} label={copy.left} onClick={()=>viewer.current?.nudge(-.05,0)} />
-        <IconAction icon={ArrowRight} label={copy.right} onClick={()=>viewer.current?.nudge(.05,0)} />
-        <IconAction icon={ArrowUp} label={copy.away} onClick={()=>viewer.current?.nudge(0,-.05)} />
-        <IconAction icon={ArrowDown} label={copy.near} onClick={()=>viewer.current?.nudge(0,.05)} />
-        <IconAction icon={MoveUp} label={copy.lift} onClick={()=>viewer.current?.lift(.05)} />
-        <IconAction icon={MoveDown} label={copy.lower} onClick={()=>viewer.current?.lift(-.05)} />
-        <IconAction icon={RotateCw} label={copy.turn} onClick={()=>viewer.current?.turn()} />
-        <IconAction icon={Crosshair} label={copy.inspect} onClick={()=>viewer.current?.inspect()} />
-        <IconAction icon={Trash2} label={copy.remove} className="noel-remove" onClick={()=>viewer.current?.remove()} />
+        <button type="button" className="noel-duplicate" onClick={onDuplicate} disabled={moving}>
+          <Copy size={16} aria-hidden="true" />{copy.duplicate}
+        </button>
+        {kind && (
+          <>
+            <IconAction icon={RotateCcw} label={copy.turnLeft(step)} onClick={()=>viewer.current?.turn(1)} />
+            <IconAction icon={RotateCw} label={copy.turnRight(step)} onClick={()=>viewer.current?.turn(-1)} />
+          </>
+        )}
+        {!kind && (
+          <>
+            <IconAction icon={ArrowLeft} label={copy.left} onClick={()=>viewer.current?.nudge(-.05,0)} />
+            <IconAction icon={ArrowRight} label={copy.right} onClick={()=>viewer.current?.nudge(.05,0)} />
+            <IconAction icon={ArrowUp} label={copy.away} onClick={()=>viewer.current?.nudge(0,-.05)} />
+            <IconAction icon={ArrowDown} label={copy.near} onClick={()=>viewer.current?.nudge(0,.05)} />
+            <IconAction icon={MoveUp} label={copy.lift} onClick={()=>viewer.current?.lift(.05)} />
+            <IconAction icon={MoveDown} label={copy.lower} onClick={()=>viewer.current?.lift(-.05)} />
+            <IconAction icon={RotateCw} label={copy.turn} onClick={()=>viewer.current?.turn()} />
+            <IconAction icon={Crosshair} label={copy.inspect} onClick={()=>viewer.current?.inspect()} />
+          </>
+        )}
+        {(!kind || isCopy) && (
+          <IconAction icon={Trash2} label={copy.remove} className="noel-remove" onClick={() => viewer.current?.remove()} />
+        )}
         <IconAction icon={X} label={copy.deselect} onClick={()=>viewer.current?.clearSelection()} />
       </div>
     </div>
@@ -138,11 +166,17 @@ function DraftNotice({ onClose }) {
 
 export function ChristmasStage({ back, showDepartment = false, account }) {
   const canvas=useRef(null), viewer=useRef(null), addTrigger=useRef(null), operations=useRef(null);
-  const page = useRef(null);
+  const page = useRef(null), importFile = useRef(null);
   const fullscreenPending = useRef(false);
+  const pointerStartedOnCanvas = useRef(false);
   const [status,setStatus]=useState('loading');
   const [attempt,setAttempt]=useState(0);
   const [mode,setMode]=useState('free');
+  const [editing, setEditing] = useState(false);
+  const [history, setHistory] = useState({ undo: false, redo: false });
+  const [storageBlocked, setStorageBlocked] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [importText, setImportText] = useState(null);
   const [selection,setSelection]=useState(null);
   const [count,setCount]=useState(null);
   const [showCatalog,setShowCatalog]=useState(false);
@@ -183,6 +217,8 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
       if (!controller.signal.aborted) {
         viewer.current=null;
         setSelection(null);
+        setEditing(false);
+        setHistory({ undo: false, redo: false });
         setHudSelection(null);
         setStatus('error');
       }
@@ -194,7 +230,7 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
         const active=await openChristmasViewer(canvas.current,{
           signal:controller.signal, showDepartment, onFailure:fail, onView:setMode, onSelection:setSelection, onCount:setCount,
           onShake:()=>setShakes((n)=>n+1),
-          hudLayer: hudLayer.current, onHudChange: setHudSelection,
+          hudLayer: hudLayer.current, onHudChange: setHudSelection, onSaveFailure: setStorageBlocked, onHistoryChange: setHistory,
         });
         if (!controller.signal.aborted && active) {
           viewer.current=active;
@@ -216,9 +252,51 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
     viewer.current?.add(type);
     closeCatalog();
   }
-  function confirm(command) {
+  function changeEditing(active) {
+    viewer.current?.setEditing(active);
+    setEditing(active);
+    setNotice('');
+    if (active) hud.disable();
+    else {
+      setShowCatalog(false);
+      setConfirmation(null);
+      setImportText(null);
+    }
+  }
+  function duplicate() {
+    const result = viewer.current?.duplicate();
+    setNotice(result === 'space' ? copy.duplicateBlocked : result === 'limit' ? copy.duplicateLimit : '');
+  }
+  function closeOperations() {
     operations.current?.removeAttribute('open');
+  }
+  function confirm(command) {
+    closeOperations();
+    setNotice('');
     setConfirmation(command);
+  }
+  function downloadLayout() {
+    const data = viewer.current?.exportArrangement();
+    if (!data) return;
+    closeOperations();
+    const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'rayon74-disposition.json';
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  async function chooseLayout(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !editing) return;
+    try {
+      if (file.size > 1000000) throw new Error();
+      setImportText(await file.text());
+      confirm('importArrangement');
+    } catch {
+      setNotice(copy.importError);
+    }
   }
   async function toggleFullscreen() {
     const element = page.current;
@@ -245,29 +323,84 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
     }
   }
   const preview = thumbnails[showDepartment ? '../assets/department-preview.webp' : './assets/scene-preview.webp'];
+  const kind = selection?.kind;
+  const crate = kind === 'crate' || kind?.endsWith('-crate');
+  const product = departmentVisit.productSelection[kind];
+  const placementHelp = product?.help ?? (kind === 'fixture' ? copy.fixturePlaceHelp : crate ? departmentVisit.cratePlaceHelp : copy.placeHelp);
+  const placementBlocked = product?.blocked ?? (crate ? departmentVisit.cratePlaceBlocked : copy.fixturePlaceBlocked);
+  const placementNote = selection?.placementBlocked ? placementBlocked : selection?.moving ? placementHelp : '';
+  const layoutNotice = notice || (storageBlocked ? copy.saveFailure : '');
+  const dialogCopy = confirmation === 'importArrangement' ? copy : scene;
+  const editRequired = editing ? undefined : copy.enableEdit;
   return (
     <main ref={page} className="noel-page" id="main-content" tabIndex={-1} data-fullscreen={fullscreen ?? undefined}>
       {back}
       <header className="noel-heading">
         <h1>{scene.title}</h1>
         <div className="noel-heading-actions">
-          {showDepartment && <ProductHudToggle hud={hud} ready={ready} />}
+          <button type="button" className="hud-toggle noel-layout-toggle" aria-pressed={editing}
+            disabled={!ready} onClick={() => changeEditing(!editing)}>
+            <Move size={17} aria-hidden="true" />{copy.editMode}
+          </button>
+          {editing && (
+            <div className="noel-history-buttons" role="group" aria-label={copy.editHistory}>
+              <IconAction icon={Undo2} label={copy.undo} disabled={!history.undo}
+                aria-keyshortcuts="Control+Z Meta+Z" onClick={() => viewer.current?.undo()} />
+              <IconAction icon={Redo2} label={copy.redo} disabled={!history.redo}
+                aria-keyshortcuts="Control+Y Control+Shift+Z Meta+Shift+Z" onClick={() => viewer.current?.redo()} />
+            </div>
+          )}
+          {showDepartment && <ProductHudToggle hud={hud} ready={ready} onToggle={() => {
+            if (editing) changeEditing(false);
+            hud.toggle();
+          }} />}
           <details ref={operations} className="noel-scene-actions">
-            <summary aria-label={copy.sceneActions} title={copy.sceneActions} tabIndex={ready?0:-1}>
+            <summary aria-label={copy.sceneActions} title={copy.sceneActions} tabIndex={ready ? 0 : -1}>
               <MoreHorizontal size={20} aria-hidden="true" />
             </summary>
             <div>
-              <button type="button" disabled={!ready} onClick={()=>confirm('restore')}><RotateCcw size={16} />{scene.restore}</button>
-              <button type="button" disabled={!ready || count===0} onClick={()=>confirm('empty')}><Trash2 size={16} />{scene.empty}</button>
+              {showDepartment && <button type="button" disabled={!ready} onClick={() => {
+                closeOperations();
+                viewer.current?.goTo('fences');
+              }}><Grid2X2 size={16} aria-hidden="true" />{departmentVisit.reserveView}</button>}
+              <button type="button" disabled={!ready || !editing} title={editRequired} onClick={() => confirm('restore')}>
+                <RotateCcw size={16} aria-hidden="true" />{scene.restore}
+              </button>
+              {showDepartment && ['restorePears', 'restoreCarrots', 'restoreSalads', 'restoreGroceries', 'restorePastry'].map((action) => (
+                <button key={action} type="button" disabled={!ready || !editing} title={editRequired} onClick={() => confirm(action)}>
+                  <RotateCcw size={16} aria-hidden="true" />{departmentVisit[action]}
+                </button>
+              ))}
+              <button type="button" disabled={!ready || !editing || count === 0} title={editRequired} onClick={() => confirm('empty')}>
+                <Trash2 size={16} aria-hidden="true" />{scene.empty}
+              </button>
+              <button type="button" disabled={!ready} onClick={downloadLayout}>
+                <Download size={16} aria-hidden="true" />{copy.exportArrangement}
+              </button>
+              <button type="button" disabled={!ready || !editing} title={editRequired} onClick={() => {
+                closeOperations();
+                importFile.current?.click();
+              }}><Upload size={16} aria-hidden="true" />{copy.importArrangement}</button>
             </div>
           </details>
-          <button ref={addTrigger} type="button" className="noel-add" onClick={()=>setShowCatalog(true)} disabled={!ready}>
-            <Plus size={18} aria-hidden="true" />{copy.add}<ChevronDown className="noel-add-arrow" size={15} aria-hidden="true" />
+          <input type="file" ref={importFile} accept=".json,application/json" hidden onChange={chooseLayout} />
+          <button ref={addTrigger} type="button" className="noel-add" aria-label={copy.add}
+            onClick={() => setShowCatalog(true)} title={editRequired ?? copy.add} disabled={!ready || !editing}>
+            <Plus size={18} aria-hidden="true" /><span>{copy.add}</span><ChevronDown className="noel-add-arrow" size={15} aria-hidden="true" />
           </button>
         </div>
       </header>
       <figure className="noel-figure">
-        <div className={selection?.moving ? 'noel-stage noel-placing' : 'noel-stage'} data-hud-open={Boolean(hud.selection)}>
+        <div className={selection?.moving ? 'noel-stage noel-placing' : 'noel-stage'}
+          data-hud-open={Boolean(hud.selection)} data-editing={editing}
+          onPointerDownCapture={(event) => { pointerStartedOnCanvas.current = event.target === canvas.current; }}
+          onClickCapture={(event) => {
+            // A tap on the canvas can reveal an action under the finger before the click is dispatched.
+            if (event.detail && pointerStartedOnCanvas.current && event.target.closest('.noel-stage-bottom')) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+          }}>
           <canvas
             key={attempt} ref={canvas} className="noel-canvas" tabIndex={ready?0:-1}
             aria-hidden={!ready} aria-label={scene.canvas} aria-describedby="noel-help" data-ready={ready}
@@ -310,52 +443,60 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
                   ))}
                 </div>
               )}
-              {mode==='walk' && (
-                <div className="noel-directions" data-hud-motion role="group" aria-label={visit.walkControls}>
-                  {directions.map(([action,Icon,label])=>(
-                    <IconAction key={action} icon={Icon} label={label} data-action={action}
-                      onPointerDown={(e)=>{
-                        e.currentTarget.setPointerCapture(e.pointerId);
-                        viewer.current?.start(action);
-                      }}
-                      onPointerUp={()=>viewer.current?.stop(action)}
-                      onPointerCancel={()=>viewer.current?.stop(action)}
-                      onLostPointerCapture={()=>viewer.current?.stop(action)}
-                      onClick={(e)=>{
-                        if (e.detail===0) { viewer.current?.start(action); viewer.current?.stop(action); }
-                      }} />
-                  ))}
-                </div>
-              )}
-              {selection?.moving && <div className="noel-placement-note" role="status">{copy.placeHelp}</div>}
               <span className="noel-screen-reader" role="status" aria-live="polite" data-tree-touches={shakes} key={shakes}>
                 {shakes ? copy.treeShake : ''}
               </span>
             </>
           )}
-          {(ready || fullscreen) && (
-            <div className="noel-camera-actions" role="group" aria-label={visit.views}>
-              {ready && mode!=='walk' && (
-                <>
-                  <IconAction icon={Plus} label={visit.zoomIn} data-hud-motion onClick={()=>viewer.current?.zoom(.80)} />
-                  <IconAction icon={Minus} label={visit.zoomOut} data-hud-motion onClick={()=>viewer.current?.zoom(1.25)} />
-                </>
-              )}
-              {ready && <IconAction icon={Crosshair} label={visit.reset} onClick={()=>viewer.current?.view('free')} />}
-              <IconAction icon={fullscreen ? Minimize : Maximize} label={fullscreen ? copy.exitFullscreen : copy.fullscreen} onClick={toggleFullscreen} />
-            </div>
-          )}
+          <div className="noel-stage-bottom">
+            {ready && mode === 'walk' && (
+              <div className="noel-directions" data-hud-motion role="group" aria-label={visit.walkControls}>
+                {directions.map(([action, Icon, label]) => (
+                  <IconAction key={action} icon={Icon} label={label} data-action={action}
+                    onPointerDown={(e) => {
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      viewer.current?.start(action);
+                    }}
+                    onPointerUp={() => viewer.current?.stop(action)}
+                    onPointerCancel={() => viewer.current?.stop(action)}
+                    onLostPointerCapture={() => viewer.current?.stop(action)}
+                    onClick={(e) => {
+                      if (e.detail === 0) { viewer.current?.start(action); viewer.current?.stop(action); }
+                    }} />
+                ))}
+              </div>
+            )}
+            {((ready && selection) || placementNote || layoutNotice) && (
+              <div className="noel-stage-context">
+                {ready && selection && <ObjectToolbar selection={selection} viewer={viewer} onDuplicate={duplicate} />}
+                {placementNote && <div className="noel-placement-note" role="status">{placementNote}</div>}
+                {layoutNotice && <div className="noel-placement-note" role="status">{layoutNotice}</div>}
+              </div>
+            )}
+            {(ready || fullscreen) && (
+              <div className="noel-camera-actions" role="group" aria-label={visit.views}>
+                {ready && mode !== 'walk' && (
+                  <>
+                    <IconAction icon={Plus} label={visit.zoomIn} data-hud-motion onClick={() => viewer.current?.zoom(.80)} />
+                    <IconAction icon={Minus} label={visit.zoomOut} data-hud-motion onClick={() => viewer.current?.zoom(1.25)} />
+                  </>
+                )}
+                {ready && <IconAction icon={Crosshair} label={visit.reset} onClick={() => viewer.current?.view('free')} />}
+                <IconAction icon={fullscreen ? Minimize : Maximize} label={fullscreen ? copy.exitFullscreen : copy.fullscreen} onClick={toggleFullscreen} />
+              </div>
+            )}
+          </div>
         </div>
-        {ready && selection && <ObjectToolbar selection={selection} viewer={viewer} />}
         <figcaption className="noel-caption">
           <span id="noel-help">
             {ready && (mode==='walk' ? (
               <>{copy.walkHelp} <span className="noel-desktop-help">{copy.keyboardWalkHelp}</span></>
             ) : (
-              <><span className="noel-desktop-help">{copy.desktopHelp}</span><span className="noel-touch-help">{copy.touchHelp}</span></>
+              <><span className="noel-desktop-help">{copy.desktopHelp}{mode === 'free' && ' ' + copy.keyboardFlightHelp}</span><span className="noel-touch-help">{copy.touchHelp}</span></>
             ))}
-            {ready && !selection && (
-              hud.enabled ? <span className="hud-help">{productHud.help}</span> : <span className="noel-pick-help">{scene.pickHelp}</span>
+            {ready && (
+              hud.enabled ? <span className="hud-help">{productHud.help}</span> :
+                <span className="noel-pick-help">{editing ? copy.editHelp : scene.pickHelp}</span>
             )}
           </span>
           <span className="noel-source">{scene.source}{ready && count!==null && (
@@ -366,9 +507,15 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
       {showDepartment && account?.isDemo && !draftDismissed && <DraftNotice onClose={() => setDraftDismissed(true)} />}
       {ready && showCatalog && <Catalog onChoose={choose} onClose={closeCatalog} />}
       {ready && confirmation && (
-        <PlanDialog title={scene[confirmation]} descriptions={[scene[`${confirmation}Help`]]} action={scene[confirmation]}
-          danger={confirmation==='empty'} onClose={()=>setConfirmation(null)} onConfirm={()=>{
-            viewer.current?.[confirmation]();
+        <PlanDialog title={dialogCopy[confirmation]} descriptions={[dialogCopy[`${confirmation}Help`]]} action={dialogCopy[confirmation]}
+          danger={confirmation === 'empty'} onClose={() => {
+            setConfirmation(null);
+            setImportText(null);
+          }} onConfirm={() => {
+            if (confirmation === 'importArrangement') {
+              setNotice(viewer.current?.importArrangement(importText) ? copy.importSuccess : copy.importError);
+              setImportText(null);
+            } else viewer.current?.[confirmation]();
             setConfirmation(null);
           }} />
       )}

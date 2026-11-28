@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { atlasUV, ball, cylinder, Model, photoPlane, plane, randomSource, rounded, tau, tubes } from './model.js';
-import { coverDisplay, coverProduce, workCard } from './workInProgress.js';
-import { column, produceStands, timberFloor } from './surroundingsLayout.js';
+import { coverProduce, workCard } from './workInProgress.js';
+import { column, produceStands, scaleLayout, timberFloor } from './surroundingsLayout.js';
 
 // Неглубокий рельеф по фото передаёт выкладку соседнего ящика несколькими сотнями треугольников.
 function trayReliefs(image) {
@@ -72,84 +72,29 @@ function fruitStand(p, m, { x, z, length, yaw, selection }, trays, work) {
   }
 }
 
-function pastry(p, m, work) {
-  const cases = p.child([4.06, 0, -1.12], [0, -Math.PI / 2, 0]);
-  for (let i = 0; i < 3; i++) {
-    const x = (i - 1) * 1.92;
-    cases.box(m.dark, [x, 0.075, 0], [1.918, 0.15, 0.93]);
-    cases.box(m.oak, [x, 0.315, 0], [1.915, 0.4, 0.95]);
-    cases.box(m.steel, [x, 0.543, 0.015], [1.918, 0.066, 0.96]);
-    cases.box(m.dark, [x, 0.879, -0.078], [1.915, 0.608, 0.75]);
-    if (work) {
-      for (const y of [0.679, 0.997]) {
-        cases.box(m.steel, [x, y, 0.306], [1.88, 0.016, 0.12]);
-        for (const offset of [-0.59, -0.2, 0.19, 0.58]) {
-          cases.box(m.dark, [x + offset, y + 0.018, 0.313], [0.30, 0.024, 0.102]);
-        }
-      }
-      coverDisplay(cases, work, x, 0.893, 0.389, 1.912, 0.678, -0.16);
-    } else {
-      cases.put(photoPlane(18), m.photos, [x, 0.893, 0.389], [1.912, 0.678, 1], [-0.16, 0, 0]);
-    }
-    cases.box(m.pine, [x, 1.255, 0.03], [1.92, 0.07, 0.81]);
-    cases.box(m.light, [x, 1.211, 0.376], [1.88, 0.011, 0.017]);
-    cases.box(m.steel, [x - 0.95, 0.888, 0.387], [0.014, 0.694, 0.023], [-0.16, 0, 0]);
-  }
-  const low = cases.child([3.42, 0, 0]);
-  low.box(m.dark, [0, 0.075, 0], [1.08, 0.15, 0.94]);
-  low.box(m.oak, [0, 0.301, 0], [1.08, 0.39, 0.945]);
-  low.box(m.steel, [0, 0.7, 0], [1.08, 0.41, 0.91]);
-  if (work) {
-    coverDisplay(low, work, 0, 0.709, 0.458, 1.078, 0.388);
-    workCard(cases, work, 0.42, 1.378, 0.285);
-    workCard(cases, work, -2.33, 1.378, 0.285);
-  } else {
-    low.put(photoPlane(20), m.photos, [0, 0.709, 0.458], [1.078, 0.388, 1]);
-  }
-  low.box(m.dark, [0, 0.925, -0.175], [1.08, 0.027, 0.61]);
-  cases.box(m.dark, [0, 2.49, -0.35], [5.76, 0.42, 0.38]);
-  cases.put(photoPlane(19), m.photos, [1.55, 2.49, -0.155], [1.72, 0.35, 1]);
-  cases.box(m.plain, [0, 1.73, -0.486], [5.9, 1.28, 0.072], undefined, 0x666966);
-  for (const x of [-2.4, -0.48, 1.47]) {
-    cases.box(m.steel, [x, 1.69, -0.424], [0.041, 1.13, 0.055]);
-    cases.box(m.dark, [x + 0.29, 1.59, -0.415], [0.46, 0.37, 0.055]);
-  }
-  const bread = cases.child([3.05, 0, -0.44]);
-  for (const y of [0.32, 0.75]) {
-    bread.box(m.pine, [0, y, 0], [0.92, 0.045, 0.29], [-0.15, 0, 0]);
-    for (let i = 0; i < 6; i++) {
-      bread.put(
-        ball,
-        m.plain,
-        [(i - 2.5) * 0.139, y + 0.095, -0.015],
-        [0.06, 0.072, 0.155],
-        [-0.33, 0.046 * i, 0],
-        i % 2 ? 0xb28657 : 0xcd9e67,
-      );
-    }
-  }
-}
-
-function holidayCorner(p, m) {
-  // Плитка доходит до деревянного пола у маленькой ёлки и аппарата.
-  const { z, depth, boards, spacing } = timberFloor;
+function woodenFloor(p, m) {
+  const { depth, boards, spacing } = timberFloor;
   for (let k = 0; k < boards; k++) {
     p.box(
       m.oak,
-      [(k - (boards - 1) / 2) * spacing, 0.002, z + (k % 3) * 0.001],
+      [(k - (boards - 1) / 2) * spacing, 0.002, (k % 3) * 0.001],
       [spacing - 0.002, 0.009, depth],
       undefined,
       [0xb49a81, 0xbaa58d, 0xb89f81][k % 3],
     );
   }
-  const machine = p.child([-0.78, 0, 3.38], [0, Math.PI - 0.08, 0]);
+}
+
+function coffeeMachine(machine, m) {
   machine.box(m.dark, [0, 0.055, 0], [0.61, 0.11, 0.48]);
   machine.put(rounded, m.plain, [0, 0.764, 0], [0.69, 1.39, 0.54], undefined, 0x8b8271);
   machine.put(photoPlane(16), m.photos, [0, 0.772, 0.274], [0.615, 1.253, 1]);
   machine.box(m.dark, [0, 1.539, -0.015], [0.536, 0.256, 0.05]);
   machine.box(m.light, [0, 1.539, 0.014], [0.5, 0.222, 0.008]);
 
-  const tree = p.child([0.79, 0, 3.35]);
+}
+
+function holidayTree(tree, m) {
   tree.put(cylinder, m.oak, [0, 0.21, 0], [0.071, 0.42, 0.071]);
   const rand = randomSource(921);
   for (let row = 0; row < 12; row++) {
@@ -208,34 +153,60 @@ export function createVisitFloor(material, { width = 19.2, depth = 19.2, x = 0, 
   return floor;
 }
 
-export function createSurroundings(m, { work } = {}) {
-  const p = new Model();
-  const { x, z, radius, height } = column;
-  p.put(cylinder, m.plain, [x, height / 2, z], [0.21, height, 0.21], undefined, 0x464646);
-  p.put(cylinder, m.steel, [x, 0.132, z], [radius, 0.264, radius]);
-  const trays = work ? null : trayReliefs(m.photos.map.image);
-  for (const stand of produceStands) fruitStand(p, m, stand, trays, work);
-  const scale = p.child([-1.39, 0, -0.91], [0, -0.92, 0]);
+export function makeScale(m) {
+  const scale = new Model();
   scale.box(m.dark, [0, 0.455, 0], [0.395, 0.91, 0.399]);
   scale.box(m.steel, [0, 0.925, 0.064], [0.36, 0.032, 0.275]);
-  scale.box(m.dark, [0, 1.081, -0.13], [0.054, 0.33, 0.06]);
-  scale.put(rounded, m.dark, [0, 1.228, -0.14], [0.296, 0.238, 0.05], [-0.13, 0, 0]);
-  scale.put(photoPlane(21), m.photos, [0, 1.229, -0.107], [0.249, 0.191, 1], [-0.13, 0, 0]);
-  const sign = p.child([1.91, 0, -0.42], [0, 1.0, 0]);
-  sign.box(m.iron, [0, 0.014, 0], [0.33, 0.025, 0.305]);
-  for (const x of [-0.161, 0.161]) sign.box(m.iron, [x, 0.744, 0], [0.012, 1.458, 0.012]);
-  sign.box(m.dark, [0, 1.24, 0], [0.332, 0.535, 0.014]);
-  sign.put(photoPlane(17), m.photos, [0, 1.24, 0.009], [0.32, 0.524, 1]);
-  sign.put(photoPlane(17), m.photos, [0, 1.24, -0.009], [0.32, 0.524, 1], [0, Math.PI, 0]);
-  pastry(p, m, work);
-  holidayCorner(p, m);
-  const group = p.finish('Abords de la charrette');
-  if (work) {
-    for (const mesh of group.children) {
+  scale.box(m.dark, [0, 1.081, -0.166], [0.054, 0.33, 0.06]);
+  const monitor = scale.child([0, 1.262, -0.14], [-0.13, 0, 0]);
+  monitor.put(rounded, m.dark, [0, 0, 0], [0.296, 0.172, 0.05]);
+  const { width, height } = m.scaleScreen.map.image;
+  monitor.put(plane, m.scaleScreen, [0, 0, 0.026], [0.268, 0.268 * height / width, 1]);
+  return scale;
+}
+
+export function makeColumn(m, { radius, height }) {
+  const pillar = new Model();
+  pillar.put(cylinder, m.plain, [0, height / 2, 0], [radius - 0.004, height, radius - 0.004], undefined, 0x464646);
+  pillar.put(cylinder, m.steel, [0, 0.132, 0], [radius, 0.264, radius]);
+  return pillar;
+}
+
+export function createSurroundings(m, work, cartZ) {
+  const group = new THREE.Group();
+  group.name = 'Abords de la charrette';
+  const fixtures = [];
+
+  function place(id, model, x, z, yaw, dimensions) {
+    const node = model.finish(id);
+    node.position.set(x, 0, z);
+    node.rotation.y = yaw;
+    for (const mesh of node.children) {
       if (mesh.material === work.cloth) mesh.receiveShadow = false;
     }
-  } else {
-    group.add(createVisitFloor(m.stone));
+    group.add(node);
+    fixtures.push({ id, node, ...dimensions });
   }
-  return group;
+
+  const { x, z, radius, height } = column;
+  place('column', makeColumn(m, column), x, cartZ + z, 0, { w: radius * 2, d: radius * 2, radius, height });
+
+  const [stand] = produceStands;
+  const side = new Model();
+  fruitStand(side, m, { ...stand, x: 0, z: 0, yaw: 0 }, null, work);
+  place('covered-side-stand', side, stand.x, cartZ + stand.z, stand.yaw,
+    { w: stand.length + 0.08, d: 1.01, height: 1.10 });
+
+  place('scale', makeScale(m), scaleLayout.x, cartZ + scaleLayout.z, scaleLayout.yaw,
+    { w: scaleLayout.w, d: scaleLayout.d, height: scaleLayout.y });
+
+  const timber = new Model(), coffee = new Model(), tree = new Model();
+  woodenFloor(timber, m);
+  coffeeMachine(coffee, m);
+  holidayTree(tree, m);
+  place('timber-floor', timber, 0, cartZ + timberFloor.z, 0,
+    { w: timberFloor.boards * timberFloor.spacing, d: timberFloor.depth, height: 0.014, floorCover: true });
+  place('nespresso', coffee, -0.78, cartZ + 3.38, Math.PI - 0.08, { w: 0.69, d: 0.58, height: 1.67 });
+  place('coffee-tree', tree, 0.79, cartZ + 3.35, 0, { w: 0.96, d: 0.96, height: 1.95, radius: 0.48 });
+  return { group, fixtures };
 }

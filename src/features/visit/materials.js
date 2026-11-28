@@ -6,6 +6,7 @@ import wickerUrl from './assets/wicker.webp';
 import skinsUrl from './assets/fruit-skins.webp';
 import photosUrl from './assets/shop-details.webp';
 import firUrl from './assets/fir.webp';
+import scaleScreenUrl from './assets/scale-screen.webp';
 
 export const haze = 0xcecdc7;
 
@@ -39,7 +40,7 @@ function addBoundaryFog(shader) {
 export async function loadMaterials(anisotropy, { boundaryFog = true } = {}) {
   const loader = new THREE.TextureLoader();
   const results = await Promise.allSettled(
-    [oakUrl, pineUrl, stoneUrl, wickerUrl, skinsUrl, photosUrl, firUrl].map((url) => loader.loadAsync(url)),
+    [oakUrl, pineUrl, stoneUrl, wickerUrl, skinsUrl, photosUrl, firUrl, scaleScreenUrl].map((url) => loader.loadAsync(url)),
   );
   if (results.some((result) => result.status === 'rejected')) {
     results.forEach((result) => {
@@ -48,7 +49,7 @@ export async function loadMaterials(anisotropy, { boundaryFog = true } = {}) {
     throw new Error('visit-textures');
   }
   const textures = results.map((result) => result.value);
-  const [oak, pine, stone, wicker, skins, photos, fir] = textures;
+  const [oak, pine, stone, wicker, skins, photos, fir, scaleScreen] = textures;
   for (const texture of textures) {
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = Math.min(anisotropy, 8);
@@ -74,6 +75,7 @@ export async function loadMaterials(anisotropy, { boundaryFog = true } = {}) {
     leaves: standard(0xffffff, { side: THREE.DoubleSide, vertexColors: true, roughness: 0.7 }),
     sleeves: standard(0xf2ede0, { roughness: 0.9 }),
     photos: standard(0xffffff, { map: photos, roughness: 0.76 }),
+    scaleScreen: new THREE.MeshBasicMaterial({ map: scaleScreen, toneMapped: false }),
     film: standard(0xfcfbef, {
       roughness: 0.18,
       transparent: true,

@@ -1,3 +1,5 @@
+import { shiftMarket } from '../salads/marketPosition.js';
+
 export const types = {
   aqua: { family: 'wrap', size: [0.247, 0.179, 0.225], ink: 0x83c3bd, ribbon: 0x32221d, tag: 'tag-aqua' },
   teal: { family: 'wrap', size: [0.245, 0.176, 0.224], ink: 0x20796f, ribbon: 0xb7d8b6, tag: 'tag-white' },
@@ -84,7 +86,7 @@ export const tables = [
 export const surfaces = [
   ...tables,
   ...rack.levels.map(([y, radius], i) => ({ id: `tray-${i}`, x: rack.x, z: rack.z, y, radius })),
-];
+].map(shiftMarket);
 
 const level = Object.fromEntries(tables.map(({ id, y }) => [id, y]));
 export function originalItems() {
@@ -231,5 +233,5 @@ export function originalItems() {
     put(type, x + 0.086, 0.421, z - 0.039, 0.25, 0.31, -0.52);
     put(type, x - 0.038, 0.531, z + 0.024, -0.145, -0.22, -0.13);
   }
-  return items;
+  return items.map(shiftMarket);
 }

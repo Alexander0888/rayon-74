@@ -6,7 +6,7 @@ const { clamp, smoothstep } = THREE.MathUtils;
 const unitSphere = new THREE.Sphere(new THREE.Vector3(), 1);
 const frontNormal = new THREE.Vector3(0, 0, 1);
 
-export function createHudScene({ scene, camera, cart, layer, orbit, onChange, redraw, aimOnFoot, hides }) {
+export function createHudScene({ scene, camera, sources, layer, orbit, onChange, redraw, aimOnFoot, hides }) {
   const face = document.createElement('div');
   face.className = 'hud-face';
   face.style.visibility = 'hidden';
@@ -23,8 +23,7 @@ export function createHudScene({ scene, camera, cart, layer, orbit, onChange, re
   const body = makeHudBody();
   const projection = makeHudProjection();
   scene.add(body.root, projection.root);
-  cart.updateWorldMatrix(true, false);
-  const targets = cart.userData.hudTargets.map(({
+  const targets = sources.flatMap((source) => source.userData.hudTargets.map(({
     id, product = id, label = copy.products[product], top, hit, radii,
   }) => {
     const beacon = document.createElement('button');
@@ -37,15 +36,25 @@ export function createHudScene({ scene, camera, cart, layer, orbit, onChange, re
     const dot = document.createElement('span');
     dot.setAttribute('aria-hidden', 'true');
     beacon.append(dot);
-    const transform = new THREE.Matrix4().makeScale(...radii).setPosition(...hit).premultiply(cart.matrixWorld);
     const target = {
-      id, product, label, beacon, top: cart.localToWorld(new THREE.Vector3(...top)),
-      transform, inverse: transform.clone().invert(),
+      id, product, label, beacon, source,
+      localTop: new THREE.Vector3(...top), top: new THREE.Vector3(),
+      localTransform: new THREE.Matrix4().makeScale(...radii).setPosition(...hit),
+      transform: new THREE.Matrix4(), inverse: new THREE.Matrix4(),
     };
     beacon.addEventListener('click', (event) => open(target, event.detail === 0));
     layer.append(beacon);
     return target;
-  });
+  }));
+
+  function updateTargets() {
+    for (const target of targets) {
+      target.source.updateWorldMatrix(true, false);
+      target.transform.multiplyMatrices(target.source.matrixWorld, target.localTransform);
+      target.inverse.copy(target.transform).invert();
+      target.top.copy(target.localTop).applyMatrix4(target.source.matrixWorld);
+    }
+  }
 
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const ray = new THREE.Ray(), hit = new THREE.Vector3(), point = new THREE.Vector3();
@@ -216,6 +225,7 @@ export function createHudScene({ scene, camera, cart, layer, orbit, onChange, re
     },
     setEnabled(value) {
       enabled = value;
+      if (enabled) updateTargets();
       if (!enabled) {
         close();
         for (const { beacon } of targets) beacon.hidden = true;

@@ -86,6 +86,69 @@ test('the virtual visit opens the combined map and acknowledges its draft notice
     await expect(walk).toBeEnabled({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: 'Se placer près de la charrette' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Se placer près du présentoir de Noël' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Se placer près du stand de carottes' })).toBeEnabled();
+    const salads = page.getByRole('button', { name: 'Se placer près des salades et des champignons' });
+    await expect(salads).toBeEnabled();
+    const groceries = page.getByRole('button', { name: 'Se placer près des olives et des herbes fraîches' });
+    await expect(groceries).toBeEnabled();
+    const bakery = page.getByRole('button', { name: 'Se placer près de la pâtisserie et de la boulangerie' });
+    await expect(bakery).toBeEnabled();
+    const edit = page.getByRole('button', { name: 'Mode déplacement', exact: true });
+    const add = page.getByRole('button', { name: 'Ajouter un objet', exact: true });
+    const hud = page.getByRole('button', { name: 'Mode HUD', exact: true });
+    const actions = page.getByLabel('Actions de la scène', { exact: true });
+    const undo = page.getByRole('button', { name: 'Annuler la dernière modification', exact: true });
+    const redo = page.getByRole('button', { name: 'Rétablir la modification annulée', exact: true });
+    await expect(edit).toHaveAttribute('aria-pressed', 'false');
+    await expect(undo).toBeHidden();
+    await expect(add).toBeDisabled();
+    await expect(page.locator('input[type=file]')).toBeHidden();
+    await actions.click();
+    await expect(page.getByRole('button', { name: 'Rétablir les caisses de poires' })).toBeDisabled();
+    await actions.click();
+    await edit.click();
+    await expect(undo).toBeDisabled();
+    await expect(redo).toBeDisabled();
+    await expect(add).toBeEnabled();
+    await actions.click();
+    await expect(page.getByRole('button', { name: 'Rétablir les caisses de poires' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Rétablir les caisses de salades et de champignons' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Rétablir les olives et les herbes' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Rétablir les produits de la pâtisserie' })).toBeEnabled();
+    await actions.click();
+    await page.getByRole('button', { name: 'Se placer près du présentoir de Noël' }).click();
+    const fullscreen = page.getByRole('button', { name: 'Plein écran', exact: true });
+    const exitFullscreen = page.getByRole('button', { name: 'Quitter le plein écran', exact: true });
+    const canvas = page.locator('.noel-canvas');
+    await fullscreen.click();
+    await expect(exitFullscreen).toBeVisible();
+    const frame = await canvas.boundingBox();
+    await add.click();
+    await page.getByRole('dialog', { name: 'Choisir un objet' })
+      .getByRole('button', { name: 'Panettone turquoise, ruban brun', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Annuler le déplacement', exact: true })).toBeVisible();
+    expect(await canvas.boundingBox()).toEqual(frame);
+    const lowerRow = await page.locator('.noel-stage-bottom').evaluate((row) => {
+      const modules = [...row.querySelectorAll('.noel-object-name, .noel-object-buttons, .noel-placement-note, .noel-camera-actions')]
+        .map((node) => node.getBoundingClientRect());
+      const midpoints = modules.map(({ y, height }) => y + height / 2);
+      const gap = (modules[0].right + modules[1].left) / 2;
+      return {
+        alignment: Math.max(...midpoints) - Math.min(...midpoints),
+        transparentGap: modules[1].left > modules[0].right &&
+          document.elementFromPoint(gap, midpoints[0])?.matches('.noel-canvas'),
+      };
+    });
+    expect(lowerRow.alignment).toBeLessThan(1);
+    expect(lowerRow.transparentGap).toBe(true);
+    await undo.click();
+    await exitFullscreen.click();
+    await groceries.click();
+    await bakery.click();
+    await hud.click();
+    await expect(edit).toHaveAttribute('aria-pressed', 'false');
+    await expect(hud).toHaveAttribute('aria-pressed', 'true');
+    await hud.click();
     await walk.click();
     await expect(walk).toHaveAttribute('aria-pressed', 'true');
     await page.getByRole('button', { name: 'Avancer', exact: true }).click();

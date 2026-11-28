@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ball, cylinder, lathe, Model, photoPlane, randomSource, ring, rounded, tau, tubes } from './model.js';
 import { bananas, fruit, ginger } from './produce.js';
+import { cartWheelOffsetZ } from './surroundingsLayout.js';
 
 const deck = 0.864;
 const riser = deck + 0.215;
@@ -36,7 +37,7 @@ const spring = (() => {
 function chassis(p, m) {
   for (const x of [-0.498, 0.498]) {
     p.rod(m.iron, [x, 0.398, -0.42], [x, 0.398, 0.42], 0.023);
-    for (const z of [-0.39, 0.39]) {
+    for (const z of [-cartWheelOffsetZ, cartWheelOffsetZ]) {
       const wheel = p.child([x, 0.398, z]);
       wheel.put(tyre, m.iron, [0, 0, 0], undefined, [Math.PI / 2, 0, 0]);
       for (let i = 0; i < 14; i++) {
@@ -419,7 +420,7 @@ function sideBaskets(p, m) {
   placard(p, m, 15, -1.435, 0.894, -0.276, 0.151, -0.95);
 }
 
-export function createCart(materials) {
+export function createCart(materials, { includeFloorBaskets = true } = {}) {
   const cart = new THREE.Group();
   cart.name = 'Charrette de fruits exotiques';
   cart.userData.hudTargets = [
@@ -430,12 +431,14 @@ export function createCart(materials) {
     { id: 'yellowDragon', top: [yellowBowl[0], riser + yellowBowl[4] + 0.18, yellowBowl[1]],
       hit: [yellowBowl[0], riser + yellowBowl[4] + 0.079, yellowBowl[1]], radii: [0.142, 0.111, 0.125] },
   ];
-  for (const [name, build] of [
+  const pieces = [
     ['Châssis et plateau', chassis],
     ['Caisses en bois', crates],
     ['Corbeilles du plateau', displayBowls],
-    ['Panières au sol', sideBaskets],
-  ]) {
+  ];
+  if (includeFloorBaskets) pieces.push(['Panières au sol', sideBaskets]);
+  else cart.userData.hudTargets = cart.userData.hudTargets.filter(({ id }) => id === 'yellowDragon');
+  for (const [name, build] of pieces) {
     const model = new Model();
     build(model, materials);
     cart.add(model.finish(name));
