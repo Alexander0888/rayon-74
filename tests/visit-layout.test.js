@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { cartRacks, departmentBounds } from '../src/features/visit/departmentLayout.js';
 import { openLayoutStorage, parseLayout } from '../src/features/visit/layoutStorage.js';
+import { publishedFurnitureLayout } from '../src/features/visit/publishedFurnitureLayout.js';
 import { crateRecord, loadCrateRecord, moveCrate, originalCrates } from '../src/features/visit/carrot/arrangement.js';
 import { carrotStand, crateSize, partitions, rackCellAt, rackCells, rackCratePose, reservePartitions } from '../src/features/visit/carrot/layout.js';
 import { pearIds, pearSlots } from '../src/features/visit/pear/layout.js';
@@ -23,6 +24,30 @@ function mockStorage(t, entries = {}) {
   });
   return data;
 }
+
+test('a fresh tour opens and exports the published furniture positions and stand copies', (t) => {
+  const data = mockStorage(t);
+  const layout = openLayoutStorage();
+  const exported = parseLayout(layout.export());
+  assert.deepEqual(exported.fixtures, publishedFurnitureLayout.fixtures);
+  assert.deepEqual(exported.copies, publishedFurnitureLayout.copies);
+  assert.equal(Object.keys(exported.fixtures).length, 16);
+  assert.equal(Object.keys(exported.copies).length, 7);
+  assert.deepEqual(exported.crates, {});
+  assert.equal(data.has('rayon74.visit-layout'), false);
+});
+
+test('a saved furniture layout takes precedence over the published positions and copies', (t) => {
+  const saved = {
+    format: 'rayon74-visit-layout', version: 1, sceneRevision: publishedFurnitureLayout.sceneRevision,
+    fixtures: { 'fence-15': { x: -4.8, z: 1.8, yaw: 0.72 } },
+    crates: {}, copies: {},
+  };
+  mockStorage(t, { 'rayon74.visit-layout': JSON.stringify(saved) });
+  const layout = openLayoutStorage();
+  assert.deepEqual(layout.state.fixtures, saved.fixtures);
+  assert.deepEqual(layout.state.copies, saved.copies);
+});
 
 test('the tour retains old placements when upgrading its layout format', (t) => {
   const walls = partitions.map(({ x, z, yaw }) => ({ x, z, yaw }));

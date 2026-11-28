@@ -3,6 +3,7 @@ import { crateRecord, readCrates, readPartitions } from './carrot/arrangement.js
 import { carrotCrateIds, cells, crateSize, partitionFootprint, partitions } from './carrot/layout.js';
 import { pearIds, pearSlots } from './pear/layout.js';
 import { localSign } from './departmentLayout.js';
+import { publishedFurnitureLayout } from './publishedFurnitureLayout.js';
 import { updateMarketPositions } from './salads/marketPosition.js';
 
 const key = 'rayon74.visit-layout';
@@ -69,7 +70,7 @@ export function openLayoutStorage() {
   } catch {
     // La disposition reste modifiable en mémoire.
   }
-  let state = saved ?? updateMarketPositions(legacyLayout());
+  let state = saved ?? updateMarketPositions(initialLayout());
   let persisted = true;
   function write() {
     try {
@@ -104,7 +105,7 @@ function readLegacy(storageKey) {
   }
 }
 
-function legacyLayout() {
+function initialLayout() {
   const fixtures = {};
   const positions = readPartitions();
   positions.forEach((pose, index) => {
@@ -122,5 +123,7 @@ function legacyLayout() {
     ...crateRecord(readCrates([...walls, ...floor, { ...localSign, ...sign }], pearIds.length, 'rayon74-visit-pear-crates-v1'), pearIds, pearSlots),
   };
   const christmas = normalizeArrangement(readLegacy('rayon74.christmas-arrangement.v1')) ?? undefined;
-  return { format, version: 1, fixtures, crates, christmas, copies: {} };
+  const hasLegacyEdits = Object.keys(fixtures).length > 0 || Object.keys(crates).length > 0 || christmas !== undefined;
+  const furniture = hasLegacyEdits ? { fixtures, copies: {} } : publishedFurnitureLayout;
+  return { format, version: 1, crates, christmas, ...furniture };
 }
