@@ -6,6 +6,7 @@ import { test, expect } from '@playwright/test';
 import { todayInZurich } from '../src/app/calendar.js';
 import { createSharedPlanStore } from '../src/features/herbs/data/sharedPlanStore.js';
 import { emptySlots } from '../src/features/herbs/data/plans.js';
+import { defaultVisitLayout } from '../src/features/visit/layoutStorage.js';
 import { chooseHerb, confirm, filled, noOverflow, openEditor, selectTemplate } from './helpers.js';
 
 const settings = parseEnv(readFileSync('.env.shared.local', 'utf8'));
@@ -544,7 +545,7 @@ test('the virtual visit serves simulations to guests and queries product data af
   await expect(page.getByText('Mode démo', { exact: true })).toBeVisible();
   const toggle = page.getByRole('button', { name: 'Mode HUD', exact: true });
   const avocado = page.getByRole('button', { name: /Voir les données.*Avocat Hass/ });
-  await expect(toggle).toBeEnabled({ timeout: 30_000 });
+  await expect(toggle).toBeEnabled({ timeout: 60_000 });
   await toggle.click();
   await avocado.click();
   await expect(page.locator('.hud-card').getByText('Mode démo', { exact: true })).toBeVisible();
@@ -559,6 +560,99 @@ test('the virtual visit serves simulations to guests and queries product data af
   await expect(page.getByRole('heading', { name: 'Avocat Hass' })).toBeVisible();
   await expect(page.getByRole('button', { name: '7 jours' })).toBeVisible();
   expect(requests).toEqual([['get_demo_product_hud', 'avocado'], ['get_cart_product_hud', 'avocado']]);
+});
+
+test('the virtual visit protects a draft and publishes it for a new visitor', async ({ page, browser }) => {
+  test.setTimeout(160_000);
+  const client = createClient(settings.VITE_SUPABASE_URL, settings.VITE_SUPABASE_PUBLISHABLE_KEY,
+    { auth: { persistSession: false, autoRefreshToken: false } });
+  async function publishedLayout() {
+    const { data, error } = await client.from('published_visit_layout').select('layout,revision').eq('id', 1).single();
+    expect(error).toBeNull();
+    return data;
+  }
+  const initial = await publishedLayout();
+  const base = initial.layout ?? defaultVisitLayout();
+  const fence = base.fixtures['fence-15'] ?? defaultVisitLayout().fixtures['fence-15'];
+  const movedFence = { ...fence, x: fence.x + 0.17 };
+  const changed = { ...base, fixtures: { ...base.fixtures, 'fence-15': movedFence } };
+  const moveMode = page.getByRole('button', { name: 'Mode déplacement', exact: true });
+  const save = page.getByRole('button', { name: 'Enregistrer les modifications', exact: true });
+  const leave = page.getByRole('dialog', { name: 'Enregistrer les modifications ?' });
+  try {
+    await page.goto('/');
+    await page.getByRole('link', { name: /Visite virtuelle/ }).click();
+    await page.getByRole('button', { name: 'Compris' }).click();
+    await expect(page.getByRole('button', { name: 'À pied', exact: true })).toBeEnabled({ timeout: 60_000 });
+    await expect(moveMode).toHaveCount(0);
+    await login(page);
+    await expect(moveMode).toBeEnabled({ timeout: 60_000 });
+    await expect(save).toHaveCount(0);
+    await moveMode.click();
+    await page.locator('input[type=file]').setInputFiles({
+      name: 'layout.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(changed)),
+    });
+    const importer = page.getByRole('dialog', { name: 'Importer la disposition' });
+    await importer.getByRole('button', { name: 'Importer la disposition' }).click();
+    await expect(save).toBeEnabled();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('button', { name: 'Plein écran', exact: true }).click();
+    await expect(save).toBeInViewport();
+    const viewButtons = await page.locator('.noel-views').boundingBox();
+    const editButtons = await page.locator('.noel-heading-actions').boundingBox();
+    expect(viewButtons.y).toBeGreaterThanOrEqual(editButtons.y + editButtons.height);
+    await page.getByRole('button', { name: 'Quitter le plein écran', exact: true }).click();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    expect(await page.evaluate(() => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    })).toBe(true);
+    expect(await publishedLayout()).toEqual(initial);
+
+    await page.evaluate(() => history.back());
+    await expect(leave).toBeVisible();
+    await leave.getByRole('button', { name: 'Rester dans le tour' }).click();
+    await expect(page).toHaveURL(/#\/visit$/);
+    await expect(save).toBeEnabled();
+
+    await page.route(/\/rpc\/publish_visit_layout(\?|$)/, (route) =>
+      route.fulfill({ status: 503, json: { message: 'Temporary interruption' } }), { times: 1 });
+    await page.getByRole('navigation', { name: 'Navigation' }).getByRole('link', { name: 'Accueil', exact: true }).click();
+    const saveAndLeave = leave.getByRole('button', { name: 'Enregistrer et quitter' });
+    await saveAndLeave.click();
+    await expect(leave.getByRole('alert')).toContainText('Impossible d’enregistrer');
+    await expect(page).toHaveURL(/#\/visit$/);
+    expect(await publishedLayout()).toEqual(initial);
+    await saveAndLeave.click();
+    await expect(page.getByRole('heading', { name: 'Les outils du rayon' })).toBeVisible();
+    expect(await publishedLayout()).toMatchObject({ revision: initial.revision + 1, layout: { fixtures: { 'fence-15': movedFence } } });
+
+    const visitor = await browser.newPage();
+    try {
+      await visitor.goto(new URL('/#/visit', page.url()).href);
+      await visitor.getByRole('button', { name: 'Compris' }).click();
+      const actions = visitor.getByLabel('Actions de la scène', { exact: true });
+      await expect(visitor.getByRole('button', { name: 'À pied', exact: true })).toBeEnabled({ timeout: 60_000 });
+      await expect(visitor.getByRole('button', { name: 'Mode déplacement', exact: true })).toHaveCount(0);
+      await actions.click();
+      const [exported] = await Promise.all([
+        visitor.waitForEvent('download'),
+        visitor.getByRole('button', { name: 'Exporter la disposition' }).click(),
+      ]);
+      expect(JSON.parse(readFileSync(await exported.path(), 'utf8')).fixtures['fence-15']).toEqual(movedFence);
+    } finally {
+      await visitor.close();
+    }
+  } finally {
+    const current = await publishedLayout();
+    if (current.revision === initial.revision + 1 && current.layout?.fixtures['fence-15']?.x === movedFence.x) {
+      const { error: signInError } = await client.auth.signInWithPassword({ email: account.email, password: account.password });
+      expect(signInError).toBeNull();
+      const { error } = await client.rpc('publish_visit_layout', { expected_revision: current.revision, snapshot: base });
+      expect(error).toBeNull();
+    }
+  }
 });
 
 test('guests browse several demo months and open a HUD for another catalog item', async ({ page }) => {

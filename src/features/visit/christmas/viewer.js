@@ -42,7 +42,8 @@ function overviewHeight(aspect) {
 }
 
 export async function openChristmasViewer(canvas, {
-  signal, showDepartment, onFailure, onView, onSelection, onCount, onShake, hudLayer, onHudChange, onSaveFailure, onHistoryChange,
+  signal, showDepartment, initialLayout, onLayoutChange, onFailure, onView, onSelection, onCount, onShake,
+  hudLayer, onHudChange, onSaveFailure, onHistoryChange,
 }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   const density = Math.min(window.devicePixelRatio || 1, window.innerWidth < 720 ? 1.60 : 1.65);
@@ -68,7 +69,7 @@ export async function openChristmasViewer(canvas, {
   const cleanup = [], held = new Map();
   const controls = canvas.closest('main') ?? canvas;
   const bounds = showDepartment ? departmentBounds : noelBounds;
-  const storage = openLayoutStorage();
+  const storage = openLayoutStorage(initialLayout);
   const history = createLayoutHistory();
   let materials, tree, inventory, department, film, fixtures, hud;
   const rackEditors = new Map();
@@ -114,6 +115,7 @@ export async function openChristmasViewer(canvas, {
   function persistLayout(next, remember = true) {
     if (remember && !history.record(storage.state, next)) return;
     storage.replace(next);
+    onLayoutChange?.(storage.state);
     onSaveFailure?.(!storage.persisted);
     onHistoryChange?.(history.buttons);
   }
@@ -1075,6 +1077,10 @@ export async function openChristmasViewer(canvas, {
       empty: () => { if (editing) commitItems([], null); },
       exportArrangement: storage.export,
       importArrangement,
+      resetLayout(layout) {
+        history.clear();
+        applyLayout(layout, null, false);
+      },
     };
   } catch (error) {
     dispose();

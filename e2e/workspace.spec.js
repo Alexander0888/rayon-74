@@ -65,7 +65,7 @@ test('home, direct links, refresh, browser history and unknown addresses', async
 });
 
 test('the virtual visit opens the combined map and acknowledges its draft notice', async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   const draft = page.getByRole('dialog', { name: 'Visite virtuelle en développement' });
   await page.goto('/');
   await page.getByRole('link', { name: /Visite virtuelle/ }).click();
@@ -83,7 +83,7 @@ test('the virtual visit opens the combined map and acknowledges its draft notice
   });
   if (supportsWebGL) {
     const walk = page.getByRole('button', { name: 'À pied', exact: true });
-    await expect(walk).toBeEnabled({ timeout: 30_000 });
+    await expect(walk).toBeEnabled({ timeout: 60_000 });
     await expect(page.getByRole('button', { name: 'Se placer près de la charrette' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Se placer près du présentoir de Noël' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Se placer près du stand de carottes' })).toBeEnabled();

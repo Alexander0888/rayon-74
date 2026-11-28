@@ -1,6 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
 import { Link, useOutletContext } from 'react-router';
-import { AppHeader } from '../../../app/AppHeader.jsx';
 import { SectionBreadcrumb } from '../../../app/SectionBreadcrumb.jsx';
 import { fr } from '../../../content/fr.js';
 import { ChristmasStage } from './ChristmasStage.jsx';
@@ -14,12 +13,7 @@ function VisitScenePage({ showDepartment }) {
     </nav>
   );
 
-  return (
-    <>
-      <AppHeader {...account} isDemo={isDemo} />
-      <ChristmasStage back={back} showDepartment={showDepartment} account={{ ...account, isDemo }} />
-    </>
-  );
+  return <ChristmasStage back={back} showDepartment={showDepartment} account={{ ...account, isDemo }} />;
 }
 
 export default function ChristmasPage() {

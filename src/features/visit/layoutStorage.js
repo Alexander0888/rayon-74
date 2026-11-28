@@ -63,16 +63,17 @@ export function parseLayout(text) {
   }
 }
 
-export function openLayoutStorage() {
-  let saved = null;
-  try {
-    saved = parseLayout(localStorage.getItem(key));
-  } catch {
-    // La disposition reste modifiable en mémoire.
-  }
-  let state = saved ?? updateMarketPositions(initialLayout());
+export function defaultVisitLayout() {
+  return updateMarketPositions({ format, version: 1, crates: {}, christmas: undefined, ...publishedFurnitureLayout });
+}
+
+export function openLayoutStorage(initialLayout) {
+  const local = initialLayout === undefined;
+  const saved = local ? parseLayout(readLocal(key)) : null;
+  let state = local ? saved ?? readLegacyLayout() ?? defaultVisitLayout() : initialLayout;
   let persisted = true;
   function write() {
+    if (!local) return;
     try {
       localStorage.setItem(key, JSON.stringify(state));
       persisted = true;
@@ -97,15 +98,23 @@ export function openLayoutStorage() {
   };
 }
 
-function readLegacy(storageKey) {
+function readLocal(storageKey) {
   try {
-    return JSON.parse(localStorage.getItem(storageKey));
+    return localStorage.getItem(storageKey);
   } catch {
     return null;
   }
 }
 
-function initialLayout() {
+function readLegacy(storageKey) {
+  try {
+    return JSON.parse(readLocal(storageKey));
+  } catch {
+    return null;
+  }
+}
+
+function readLegacyLayout() {
   const fixtures = {};
   const positions = readPartitions();
   positions.forEach((pose, index) => {
@@ -124,6 +133,5 @@ function initialLayout() {
   };
   const christmas = normalizeArrangement(readLegacy('rayon74.christmas-arrangement.v1')) ?? undefined;
   const hasLegacyEdits = Object.keys(fixtures).length > 0 || Object.keys(crates).length > 0 || christmas !== undefined;
-  const furniture = hasLegacyEdits ? { fixtures, copies: {} } : publishedFurnitureLayout;
-  return { format, version: 1, crates, christmas, ...furniture };
+  return hasLegacyEdits ? updateMarketPositions({ format, version: 1, fixtures, crates, christmas, copies: {} }) : null;
 }

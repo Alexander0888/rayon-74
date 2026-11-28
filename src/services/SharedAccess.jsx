@@ -98,10 +98,11 @@ export function SharedAccess({ client, children }) {
   const currentMembership = userId && membership?.userId === userId && membership.attempt === attempt
     ? membership : null;
   const canEdit = currentMembership?.role === 'manager';
+  const canPublishVisit = canEdit || currentMembership?.role === 'admin';
 
   useEffect(() => {
-    if (canEdit) setLoginOpen(false);
-  }, [canEdit]);
+    if (canPublishVisit) setLoginOpen(false);
+  }, [canPublishVisit]);
 
   async function signOut() {
     setSignOutError(false);
@@ -118,16 +119,16 @@ export function SharedAccess({ client, children }) {
   return (
     <>
       {children({
-        workspaceKey: canEdit ? userId : 'public',
-        canEdit,
+        workspaceKey: canPublishVisit ? userId : 'public',
+        canEdit, canPublishVisit,
         isDemo: userId === null,
         accessPending: userId === undefined || Boolean(userId && !currentMembership),
         startEditing: canEdit && loginOpen,
-        signIn: canEdit ? undefined : () => setLoginOpen(true),
-        signOut: canEdit ? signOut : undefined,
+        signIn: canPublishVisit ? undefined : () => setLoginOpen(true),
+        signOut: canPublishVisit ? signOut : undefined,
         signOutError,
       })}
-      {loginOpen && !canEdit && (
+      {loginOpen && !canPublishVisit && (
         <SignIn client={client} membership={currentMembership} onClose={() => setLoginOpen(false)} onSuccess={(id) => {
           setUserId(id);
           setAttempt((value) => value + 1);

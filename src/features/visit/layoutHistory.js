@@ -1,9 +1,9 @@
-function sameValue(left, right) {
+export function sameLayout(left, right) {
   if (left === right) return true;
   if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
   const keys = Object.keys(left);
   return keys.length === Object.keys(right).length &&
-    keys.every((key) => Object.hasOwn(right, key) && sameValue(left[key], right[key]));
+    keys.every((key) => Object.hasOwn(right, key) && sameLayout(left[key], right[key]));
 }
 
 export function createLayoutHistory(limit = 100) {
@@ -11,7 +11,7 @@ export function createLayoutHistory(limit = 100) {
   return {
     get buttons() { return { undo: past.length > 0, redo: future.length > 0 }; },
     record(before, after) {
-      if (sameValue(before, after)) return false;
+      if (sameLayout(before, after)) return false;
       past.push({ before, after });
       if (past.length > limit) past.shift();
       future.length = 0;
@@ -28,6 +28,9 @@ export function createLayoutHistory(limit = 100) {
       if (!change) return null;
       past.push(change);
       return change.after;
+    },
+    clear() {
+      past.length = future.length = 0;
     },
   };
 }

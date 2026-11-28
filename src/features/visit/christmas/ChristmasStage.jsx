@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CakeSlice, Carrot, ChevronDown, Construction, Copy, Crosshair, Download, Footprints, Grid2X2,
-  Leaf, Maximize, Minimize, Minus, MoreHorizontal, Move, MoveDown, MoveUp, Orbit, Plus, Redo2, RotateCcw, RotateCw, Search, ShoppingBasket, Sprout, Trash2, TreePine, Undo2, Upload, X,
+  Leaf, Maximize, Minimize, Minus, MoreHorizontal, Move, MoveDown, MoveUp, Orbit, Plus, Redo2, RotateCcw, RotateCw, Save, Search, ShoppingBasket, Sprout, Trash2, TreePine, Undo2, Upload, X,
 } from 'lucide-react';
+import { useBlocker } from 'react-router';
+import { AppHeader } from '../../../app/AppHeader.jsx';
 import { PlanDialog } from '../../../components/PlanDialog.jsx';
-import { christmas as copy, departmentVisit, fr, pageTitle, productHud, visit } from '../../../content/fr.js';
+import { christmas as copy, departmentVisit, fr, pageTitle, productHud, visit, visitPublication } from '../../../content/fr.js';
 import { herbById } from '../../herbs/data/herbs.js';
 import { ProductHudLayer, ProductHudToggle, useProductHud } from '../hud/ProductHud.jsx';
+import { useVisitPublication } from '../useVisitPublication.js';
 import { types } from './layout.js';
 import './christmas.css';
 
@@ -184,12 +187,41 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
   const [shakes,setShakes]=useState(0);
   const [fullscreen, setFullscreen] = useState(null);
   const [draftDismissed, setDraftDismissed] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const ready=status==='ready';
   const scene = showDepartment ? departmentVisit : copy;
   const hud = useProductHud(viewer, canvas, ready && showDepartment);
   const { layer: hudLayer, setSelection: setHudSelection } = hud;
+  const publication = useVisitPublication(account.canPublishVisit);
+  const { open: openLayout, change: changeLayout, dirty, saving } = publication;
+  const editable = !publication.shared || (account.canPublishVisit && !publication.loadFailed);
+  const leaveBlocked = dirty || saving;
+  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+    leaveBlocked && currentLocation.pathname !== nextLocation.pathname);
+  const leavingPage = blocker.state === 'blocked';
+  const leaveDialog = leavingPage || confirmSignOut;
 
   useEffect(() => { document.title = pageTitle(scene.title); }, [scene.title]);
+  useEffect(() => {
+    if (blocker.state === 'blocked' && !leaveBlocked) blocker.proceed();
+  }, [blocker, leaveBlocked]);
+  useEffect(() => {
+    if (!leaveBlocked) return;
+    function warn(event) {
+      event.preventDefault();
+      event.returnValue = true;
+    }
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [leaveBlocked]);
+  useEffect(() => {
+    if (editable) return;
+    viewer.current?.setEditing(false);
+    setEditing(false);
+    setShowCatalog(false);
+    setConfirmation(null);
+    setImportText(null);
+  }, [editable]);
   useEffect(() => {
     function syncFullscreen() {
       setFullscreen((mode) => {
@@ -225,10 +257,11 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
     }
     async function start() {
       try {
-        const {openChristmasViewer}=await import('./viewer.js');
+        const [{ openChristmasViewer }, initialLayout] = await Promise.all([import('./viewer.js'), openLayout(controller.signal)]);
         if (controller.signal.aborted) return;
         const active=await openChristmasViewer(canvas.current,{
-          signal:controller.signal, showDepartment, onFailure:fail, onView:setMode, onSelection:setSelection, onCount:setCount,
+          signal:controller.signal, showDepartment, initialLayout, onLayoutChange:changeLayout,
+          onFailure:fail, onView:setMode, onSelection:setSelection, onCount:setCount,
           onShake:()=>setShakes((n)=>n+1),
           hudLayer: hudLayer.current, onHudChange: setHudSelection, onSaveFailure: setStorageBlocked, onHistoryChange: setHistory,
         });
@@ -242,7 +275,7 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
     }
     start();
     return ()=>{ controller.abort(); viewer.current=null; };
-  },[attempt, showDepartment, hudLayer, setHudSelection]);
+  },[attempt, showDepartment, hudLayer, setHudSelection, openLayout, changeLayout]);
 
   function closeCatalog() {
     setShowCatalog(false);
@@ -253,6 +286,7 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
     closeCatalog();
   }
   function changeEditing(active) {
+    if (active && !editable) return;
     viewer.current?.setEditing(active);
     setEditing(active);
     setNotice('');
@@ -262,6 +296,36 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
       setConfirmation(null);
       setImportText(null);
     }
+  }
+  function signOut() {
+    changeEditing(false);
+    setConfirmSignOut(false);
+    void account.signOut?.();
+  }
+  function requestSignOut() {
+    if (dirty) setConfirmSignOut(true);
+    else signOut();
+  }
+  async function saveAndLeave() {
+    if (await publication.save() && !leavingPage) signOut();
+  }
+  function stay() {
+    if (leavingPage) blocker.reset();
+    setConfirmSignOut(false);
+  }
+  function discardAndLeave() {
+    if (leavingPage) {
+      blocker.proceed();
+      return;
+    }
+    const saved = publication.discard();
+    if (saved) viewer.current?.resetLayout(saved);
+    signOut();
+  }
+  function retryLayout() {
+    closeOperations();
+    setStatus('loading');
+    setAttempt((value) => value + 1);
   }
   function duplicate() {
     const result = viewer.current?.duplicate();
@@ -329,19 +393,30 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
   const placementHelp = product?.help ?? (kind === 'fixture' ? copy.fixturePlaceHelp : crate ? departmentVisit.cratePlaceHelp : copy.placeHelp);
   const placementBlocked = product?.blocked ?? (crate ? departmentVisit.cratePlaceBlocked : copy.fixturePlaceBlocked);
   const placementNote = selection?.placementBlocked ? placementBlocked : selection?.moving ? placementHelp : '';
-  const layoutNotice = notice || (storageBlocked ? copy.saveFailure : '');
+  const layoutNotice = publication.notice?.message || (publication.loadFailed ? visitPublication.loadFailed : '') ||
+    notice || (storageBlocked ? copy.saveFailure : '');
   const dialogCopy = confirmation === 'importArrangement' ? copy : scene;
   const editRequired = editing ? undefined : copy.enableEdit;
-  return (
+  return <>
+    <AppHeader {...account} signOut={account.signOut && requestSignOut} pending={saving} />
     <main ref={page} className="noel-page" id="main-content" tabIndex={-1} data-fullscreen={fullscreen ?? undefined}>
       {back}
       <header className="noel-heading">
         <h1>{scene.title}</h1>
         <div className="noel-heading-actions">
-          <button type="button" className="hud-toggle noel-layout-toggle" aria-pressed={editing}
-            disabled={!ready} onClick={() => changeEditing(!editing)}>
-            <Move size={17} aria-hidden="true" />{copy.editMode}
-          </button>
+          {dirty && editable && (
+            <button type="button" className="noel-add noel-publish-layout" aria-label={visitPublication.save}
+              title={visitPublication.save} aria-busy={saving} disabled={saving || selection?.moving}
+              onClick={() => void publication.save()}>
+              <Save size={17} aria-hidden="true" /><span>{saving ? fr.saving : fr.save}</span>
+            </button>
+          )}
+          {editable && (
+            <button type="button" className="hud-toggle noel-layout-toggle" aria-pressed={editing}
+              disabled={!ready} onClick={() => changeEditing(!editing)}>
+              <Move size={17} aria-hidden="true" />{copy.editMode}
+            </button>
+          )}
           {editing && (
             <div className="noel-history-buttons" role="group" aria-label={copy.editHistory}>
               <IconAction icon={Undo2} label={copy.undo} disabled={!history.undo}
@@ -359,35 +434,40 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
               <MoreHorizontal size={20} aria-hidden="true" />
             </summary>
             <div>
+              {publication.loadFailed && <button type="button" onClick={retryLayout}>{fr.retry}</button>}
               {showDepartment && <button type="button" disabled={!ready} onClick={() => {
                 closeOperations();
                 viewer.current?.goTo('fences');
               }}><Grid2X2 size={16} aria-hidden="true" />{departmentVisit.reserveView}</button>}
-              <button type="button" disabled={!ready || !editing} title={editRequired} onClick={() => confirm('restore')}>
-                <RotateCcw size={16} aria-hidden="true" />{scene.restore}
-              </button>
-              {showDepartment && ['restorePears', 'restoreCarrots', 'restoreSalads', 'restoreGroceries', 'restorePastry'].map((action) => (
-                <button key={action} type="button" disabled={!ready || !editing} title={editRequired} onClick={() => confirm(action)}>
-                  <RotateCcw size={16} aria-hidden="true" />{departmentVisit[action]}
-                </button>
-              ))}
-              <button type="button" disabled={!ready || !editing || count === 0} title={editRequired} onClick={() => confirm('empty')}>
-                <Trash2 size={16} aria-hidden="true" />{scene.empty}
-              </button>
+              {editable && (
+                <>
+                  <button type="button" disabled={!ready || !editing} title={editRequired} onClick={() => confirm('restore')}>
+                    <RotateCcw size={16} aria-hidden="true" />{scene.restore}
+                  </button>
+                  {showDepartment && ['restorePears', 'restoreCarrots', 'restoreSalads', 'restoreGroceries', 'restorePastry'].map((action) => (
+                    <button key={action} type="button" disabled={!ready || !editing} title={editRequired} onClick={() => confirm(action)}>
+                      <RotateCcw size={16} aria-hidden="true" />{departmentVisit[action]}
+                    </button>
+                  ))}
+                  <button type="button" disabled={!ready || !editing || count === 0} title={editRequired} onClick={() => confirm('empty')}>
+                    <Trash2 size={16} aria-hidden="true" />{scene.empty}
+                  </button>
+                </>
+              )}
               <button type="button" disabled={!ready} onClick={downloadLayout}>
                 <Download size={16} aria-hidden="true" />{copy.exportArrangement}
               </button>
-              <button type="button" disabled={!ready || !editing} title={editRequired} onClick={() => {
+              {editable && <button type="button" disabled={!ready || !editing} title={editRequired} onClick={() => {
                 closeOperations();
                 importFile.current?.click();
-              }}><Upload size={16} aria-hidden="true" />{copy.importArrangement}</button>
+              }}><Upload size={16} aria-hidden="true" />{copy.importArrangement}</button>}
             </div>
           </details>
           <input type="file" ref={importFile} accept=".json,application/json" hidden onChange={chooseLayout} />
-          <button ref={addTrigger} type="button" className="noel-add" aria-label={copy.add}
+          {editable && <button ref={addTrigger} type="button" className="noel-add" aria-label={copy.add}
             onClick={() => setShowCatalog(true)} title={editRequired ?? copy.add} disabled={!ready || !editing}>
             <Plus size={18} aria-hidden="true" /><span>{copy.add}</span><ChevronDown className="noel-add-arrow" size={15} aria-hidden="true" />
-          </button>
+          </button>}
         </div>
       </header>
       <figure className="noel-figure">
@@ -413,7 +493,7 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
                 {status==='error' ? (
                   <>
                     <span>{copy.unavailable}</span>
-                    <button type="button" className="button" onClick={()=>{ setStatus('loading'); setAttempt((n)=>n+1); }}>{fr.retry}</button>
+                    <button type="button" className="button" onClick={retryLayout}>{fr.retry}</button>
                   </>
                 ) : <span>{copy.loading}</span>}
               </div>
@@ -470,7 +550,7 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
               <div className="noel-stage-context">
                 {ready && selection && <ObjectToolbar selection={selection} viewer={viewer} onDuplicate={duplicate} />}
                 {placementNote && <div className="noel-placement-note" role="status">{placementNote}</div>}
-                {layoutNotice && <div className="noel-placement-note" role="status">{layoutNotice}</div>}
+                {layoutNotice && <div className="noel-placement-note" role={publication.notice?.error ? 'alert' : 'status'}>{layoutNotice}</div>}
               </div>
             )}
             {(ready || fullscreen) && (
@@ -504,9 +584,9 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
           )}</span>
         </figcaption>
       </figure>
-      {showDepartment && account?.isDemo && !draftDismissed && <DraftNotice onClose={() => setDraftDismissed(true)} />}
-      {ready && showCatalog && <Catalog onChoose={choose} onClose={closeCatalog} />}
-      {ready && confirmation && (
+      {showDepartment && account.isDemo && !draftDismissed && !leaveDialog && <DraftNotice onClose={() => setDraftDismissed(true)} />}
+      {ready && showCatalog && !leaveDialog && <Catalog onChoose={choose} onClose={closeCatalog} />}
+      {ready && confirmation && !leaveDialog && (
         <PlanDialog title={dialogCopy[confirmation]} descriptions={[dialogCopy[`${confirmation}Help`]]} action={dialogCopy[confirmation]}
           danger={confirmation === 'empty'} onClose={() => {
             setConfirmation(null);
@@ -519,6 +599,14 @@ export function ChristmasStage({ back, showDepartment = false, account }) {
             setConfirmation(null);
           }} />
       )}
+      {leaveDialog && (
+        <PlanDialog title={visitPublication.leaveTitle}
+          descriptions={[editable ? visitPublication.leaveDescription : visitPublication.signInToPublish]}
+          action={saving ? fr.saving : visitPublication.saveAndLeave} cancelLabel={visitPublication.stay}
+          extraAction={{ label: visitPublication.discardAndLeave, onClick: discardAndLeave }}
+          pending={saving} confirmDisabled={!editable} error={publication.notice?.error ? publication.notice.message : null}
+          onClose={stay} onConfirm={saveAndLeave} />
+      )}
     </main>
-  );
+  </>;
 }

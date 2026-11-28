@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { fr } from '../content/fr.js';
 
-export function PlanDialog({ title, descriptions, initialName, action, danger, maxNameLength, onClose, onConfirm }) {
+export function PlanDialog({ title, descriptions, initialName, action, danger, maxNameLength, onClose, onConfirm,
+  cancelLabel = fr.cancel, extraAction, pending = false, confirmDisabled = false, error }) {
   const dialog = useRef(null);
   const input = useRef(null);
   const [name, setName] = useState(initialName ?? '');
@@ -19,6 +20,7 @@ export function PlanDialog({ title, descriptions, initialName, action, danger, m
 
   function submit(event) {
     event.preventDefault();
+    if (pending || confirmDisabled) return;
     if (asksName && !name.trim()) {
       input.current.setCustomValidity(fr.requiredName);
       input.current.reportValidity();
@@ -30,7 +32,7 @@ export function PlanDialog({ title, descriptions, initialName, action, danger, m
   return (
     <dialog ref={dialog} aria-labelledby="dialog-title"
       aria-describedby={descriptions.length ? 'dialog-description' : undefined}
-      onCancel={(event) => { event.preventDefault(); onClose(); }}>
+      onCancel={(event) => { event.preventDefault(); if (!pending) onClose(); }}>
       <form onSubmit={submit}>
         <h2 id="dialog-title">{title}</h2>
         {!!descriptions.length && (
@@ -49,9 +51,15 @@ export function PlanDialog({ title, descriptions, initialName, action, danger, m
               }} />
           </div>
         )}
+        {error && <p className="notice error" role="alert">{error}</p>}
         <div className="dialog-actions">
-          <button className="button" type="button" onClick={onClose}>{fr.cancel}</button>
-          {action && <button className={danger ? 'button danger' : 'button primary'} type="submit">{action}</button>}
+          <button className="button" type="button" onClick={onClose} disabled={pending}>{cancelLabel}</button>
+          {extraAction && (
+            <button className="button" type="button" onClick={extraAction.onClick} disabled={pending}>{extraAction.label}</button>
+          )}
+          {action && (
+            <button className={danger ? 'button danger' : 'button primary'} type="submit" disabled={pending || confirmDisabled}>{action}</button>
+          )}
         </div>
       </form>
     </dialog>

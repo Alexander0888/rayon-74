@@ -139,6 +139,20 @@ export const visit = {
   walkControls: 'Déplacement dans le rayon',
 };
 
+export const visitPublication = {
+  save: 'Enregistrer les modifications',
+  saved: 'Disposition publiée.',
+  loadFailed: 'Impossible de charger la disposition publiée. La carte de départ est affichée.',
+  saveFailed: 'Impossible d’enregistrer la disposition. Réessayez.',
+  conflict: 'Une autre disposition a été publiée. Exportez vos modifications avant de rouvrir le tour.',
+  leaveTitle: 'Enregistrer les modifications ?',
+  leaveDescription: 'La disposition enregistrée sera utilisée pour les prochaines visites.',
+  saveAndLeave: 'Enregistrer et quitter',
+  discardAndLeave: 'Quitter sans enregistrer',
+  stay: 'Rester dans le tour',
+  signInToPublish: 'Connectez-vous avec un compte autorisé pour publier la disposition.',
+};
+
 export const productHud = {
   mode: 'Mode HUD',
   help: 'Touchez une corbeille signalée pour afficher ses données.',

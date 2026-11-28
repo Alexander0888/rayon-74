@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { cartRacks, departmentBounds } from '../src/features/visit/departmentLayout.js';
-import { openLayoutStorage, parseLayout } from '../src/features/visit/layoutStorage.js';
+import { defaultVisitLayout, openLayoutStorage, parseLayout } from '../src/features/visit/layoutStorage.js';
 import { publishedFurnitureLayout } from '../src/features/visit/publishedFurnitureLayout.js';
 import { crateRecord, loadCrateRecord, moveCrate, originalCrates } from '../src/features/visit/carrot/arrangement.js';
 import { carrotStand, crateSize, partitions, rackCellAt, rackCells, rackCratePose, reservePartitions } from '../src/features/visit/carrot/layout.js';
@@ -47,6 +47,18 @@ test('a saved furniture layout takes precedence over the published positions and
   const layout = openLayoutStorage();
   assert.deepEqual(layout.state.fixtures, saved.fixtures);
   assert.deepEqual(layout.state.copies, saved.copies);
+});
+
+test('a shared-layout draft starts from the published scene and stays in memory', (t) => {
+  const saved = { ...defaultVisitLayout(), fixtures: { 'fence-15': { x: -4.8, z: 1.8, yaw: 0.72 } }, copies: {} };
+  const localStorage = mockStorage(t, { 'rayon74.visit-layout': JSON.stringify(saved) });
+  const published = defaultVisitLayout();
+  const draft = openLayoutStorage(published);
+  assert.deepEqual(draft.state, published);
+  draft.set({ fixtures: {} });
+  assert.deepEqual(draft.state.fixtures, {});
+  assert.deepEqual(JSON.parse(localStorage.get('rayon74.visit-layout')).fixtures, saved.fixtures);
+  assert.deepEqual(openLayoutStorage(published).state, published);
 });
 
 test('the tour retains old placements when upgrading its layout format', (t) => {

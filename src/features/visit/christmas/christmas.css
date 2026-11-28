@@ -535,6 +535,11 @@ body:has(.noel-page[data-fullscreen='viewport']) :is(.site-header, .site-footer,
   .noel-stage { height: max(300px, calc(100svh - 88px)); }
 }
 
+@media (max-width: 560px) {
+  .noel-page[data-fullscreen]:has(.noel-publish-layout) .noel-views { top: calc(var(--noel-ui-top) + 101px); }
+  .noel-page[data-fullscreen]:has(.noel-publish-layout) .noel-landmarks { top: calc(var(--noel-ui-top) + 160px); }
+}
+
 @media (max-width: 460px) {
   .noel-landmarks { gap: 2px; padding-inline: 3px; }
   .noel-page .noel-landmarks button { padding-inline: 3px; }
