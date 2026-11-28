@@ -3,6 +3,7 @@ import { atlasUV, plane, rounded } from '../model.js';
 import { surface } from '../christmas/geometry.js';
 import { crateMaterials } from '../carrot/crates.js';
 import { paintedTexture } from '../texture.js';
+import { radishMaterials } from './radishes.js';
 // Порядок ценников в price-cards.webp, по 6 фотографий в строке.
 const cardTypes = [
   'trio', 'butter', 'batavia', 'romaine', 'radicchio', 'swiss-cucumber',
@@ -51,7 +52,8 @@ function packetFilm() {
   });
 }
 
-export function marketMaterials(m, { 'produce-skins': skin, 'price-cards': cards }) {
+export function marketMaterials(m, textures) {
+  const { 'produce-skins': skin, 'price-cards': cards } = textures;
   const wrappers = packagingLabels();
   m.textures.saladLabels = wrappers;
   return {
@@ -65,6 +67,7 @@ export function marketMaterials(m, { 'produce-skins': skin, 'price-cards': cards
     cap: m.material({ map: skin, roughness: 0.78, bumpMap: skin, bumpScale: 0.00026 }),
     cucumber: m.material({ map: skin, roughness: 0.44, bumpMap: skin, bumpScale: 0.00043, clearcoat: 0.20 }, true),
     root: m.paint(0xffffff, 0.62),
+    radish: radishMaterials(m, textures),
     pale: m.paint(0xf0e1bb, 0.83),
     tray: m.paint(0xbca882, 0.83),
     limeTray: m.paint(0xa3b34c, 0.64),

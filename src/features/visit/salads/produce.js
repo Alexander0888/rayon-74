@@ -4,6 +4,7 @@ import { randomFrom, surface } from '../christmas/geometry.js';
 import { crateShell } from '../carrot/crates.js';
 import { saladIds, saladTypes } from './layout.js';
 import { packet, rackCard } from './details.js';
+import { fillRadishCrate } from './radishes.js';
 
 const varieties = {
   butter: { tile: 0, colors: [0x62a13c, 0x85ad48, 0xacc75f], width: 1.01, rise: 0.54, ruffle: 0.11, vein: 0.25, size: 0.103, rows: 3 },
@@ -163,26 +164,6 @@ function endives(model, m, type, random) {
   }
 }
 
-function radishes(model, m, random) {
-  const cords = [];
-  for (let row = 0; row < 4; row++) for (const column of [-1, 1]) {
-    const x = column * 0.084, z = (row - 1.5) * 0.115;
-    const direction = row % 2 ? -1 : 1;
-    for (let i = 0; i < 7; i++) {
-      const px = x + (random() - 0.5) * 0.097, pz = z + (random() - 0.5) * 0.075;
-      const py = 0.065 + random() * 0.064, radius = 0.013 + random() * 0.011;
-      const tint = [0xb93b47, 0xba364a, 0xdd5260, 0xdc6472][i % 4];
-      model.put(m.bulb, m.root, [px, py, pz], [radius, radius * 0.89, radius], [0, 0, 0], tint);
-      cords.push([[px, py, pz], [px + 0.023, py + 0.007, pz + direction * 0.026],
-        [x + 0.030, py + 0.021, z + direction * 0.062]]);
-      const size = 0.036 + random() * 0.034;
-      model.put(m.plants.batavia[i % 2], m.leaf, [x + 0.03, py + 0.018, z + direction * 0.046],
-        [size, size * 0.42, size], [0.49, (direction > 0 ? 0 : Math.PI) + (random() - 0.5) * 1.90, 0]);
-    }
-  }
-  model.put(tubes(cords, 0.00165, 4), m.greenStem, [0, 0, 0]);
-}
-
 function scallions(model, m, random) {
   const stems = [], roots = [];
   for (let row = 0; row < 2; row++) for (const center of [-0.117, 0, 0.117]) {
@@ -219,7 +200,7 @@ export function makeSaladCrates(m, materials) {
     else if (type.includes('cucumber')) cucumbers(model, assets, type, random);
     else if (type.includes('endive')) endives(model, assets, type, random);
     else if (type === 'spring-onion') scallions(model, assets, random);
-    else if (type === 'radish') radishes(model, assets, random);
+    else if (type === 'radish') fillRadishCrate(model, assets.radish, random);
     else heads(model, assets, type, random);
     rackCard(model, assets, type, { y: 0.180, z: -0.263 });
     return model.finish(saladIds[index]);
